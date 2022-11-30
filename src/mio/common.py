@@ -116,8 +116,7 @@ def merge_dict(d1, d2):
     """
     for k, v2 in d2.items():
         v1 = d1.get(k)  # returns None if v1 has no value for this key
-        if (isinstance(v1, collections.Mapping) and
-                isinstance(v2, collections.Mapping)):
+        if (type(v1) is dict) and (type(v2) is dict):
             merge_dict(v1, v2)
         else:
             d1[k] = v2
