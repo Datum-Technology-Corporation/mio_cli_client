@@ -414,7 +414,12 @@ def do_elaborate(ip, sim_job, wd):
         launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd, output=cfg.dbg)
     elif sim_job.simulator == common.simulators_enum.QUESTA:
         arg_list += questa_default_elaboration_args
-        # TODO Add elaboration output argument for questa
+        arg_list += def_list
+        arg_list += elab_list
+        arg_list += deps_list
+        arg_list.append(f"-work {ip.vendor}__{ip.name}")
+        arg_list.append(f"-o {ip.vendor}__{ip.name}")
+        arg_list.append(f"-l {elaboration_log_path}")
         launch_eda_bin(cfg.questa_home + "/vopt", arg_list, wd, output=cfg.dbg)
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
         arg_list += riviera_default_elaboration_args
