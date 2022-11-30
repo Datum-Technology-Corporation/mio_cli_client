@@ -292,7 +292,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list.append("-f " + flist_path)
         arg_list += cmp_args_list
         arg_list.append("-l "  + compilation_log_path)
-        arg_list.append("-work " + name + "=" + cmp_out)
+        arg_list.append("-work " + cmp_out)
         launch_eda_bin(cfg.questa_home + "/vlog", arg_list, wd=sim_out, output=cfg.dbg)
         
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
