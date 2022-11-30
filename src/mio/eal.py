@@ -27,7 +27,7 @@ vivado_default_compilation_args  = ["--incr", "-sv"]
 metrics_default_compilation_args = ["+acc+b"]
 vcs_default_compilation_args     = ["-lca", "-sverilog"]
 xcelium_default_compilation_args = []
-questa_default_compilation_args  = ["-64"]
+questa_default_compilation_args  = ["-64", "-incrcomp"]
 riviera_default_compilation_args = []
 
 vivado_project_default_vlog_compilation_args = ["--relax"]
@@ -37,14 +37,14 @@ vivado_default_elaboration_args  = ["--incr", "-relax", "--O0", "-v 0", "-timesc
 metrics_default_elaboration_args = ["+acc+b"]
 vcs_default_elaboration_args     = []
 xcelium_default_elaboration_args = []
-questa_default_elaboration_args  = []
+questa_default_elaboration_args  = ["-64"]
 riviera_default_elaboration_args = []
 
 vivado_default_simulation_args  = ["--stats"]
 metrics_default_simulation_args = []
 vcs_default_simulation_args     = []
 xcelium_default_simulation_args = []
-questa_default_simulation_args  = []
+questa_default_simulation_args  = ["-64", "-c"]
 riviera_default_simulation_args = []
 
 vivado_cmp_log_error_regexes  = ["ERROR:"]
@@ -229,10 +229,8 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
     license_macros_file_path = ""
     
     ip_dir_name = f"{vendor}__{name}"
-    if local:
-        cmp_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_local/" + ip_dir_name
-    else:
-        cmp_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_external/" + ip_dir_name
+    cmp_out_dir = cfg.sim_output_dir + "/" + sim_str + "/cmp_out/"
+    cmp_out = cmp_out_dir + ip_dir_name
     sim_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_wd/" + ip_dir_name
     common.create_dir(cmp_out)
     common.create_dir(sim_out)
@@ -290,8 +288,11 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list.append(license_macros_file_path);
         arg_list.append("-f " + flist_path)
         arg_list += cmp_args_list
+        arg_list.append("-L uvm")
+        arg_list += deps_list
+        arg_list.append(f"-Ldir {cmp_out_dir}")
         arg_list.append("-l "  + compilation_log_path)
-        arg_list.append("-work " + cmp_out)
+        arg_list.append(f"-work {cmp_out}")
         launch_eda_bin(cfg.questa_home + "/vlog", arg_list, wd=sim_out, output=cfg.dbg)
         
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
@@ -308,10 +309,7 @@ def do_compile_vivado_project(ip, deps, sim_job, local):
     ip_str = f"{ip.vendor}/{ip.name}"
     ip_dir_name = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
-    if local:
-        cmp_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_local/" + ip_dir_name
-    else:
-        cmp_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_external/" + ip_dir_name
+    cmp_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_out/" + ip_dir_name
     sim_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_wd/" + ip_dir_name
     
     if sim_job.simulator == common.simulators_enum.VIVADO:
@@ -351,11 +349,8 @@ def do_elaborate(ip, sim_job, wd):
     deps_ip_list = get_dep_list(ip, sim_job)
     deps_list = convert_deps_to_args(deps_ip_list, sim_job)
     elaboration_log_path = cfg.sim_dir + "/elab/" + ip_dir_name + "." + sim_str + ".elab.log"
-    ip_cmp_path = ""
-    if ip.is_local:
-        ip_cmp_path = cfg.sim_output_dir + "/" + sim_str + "/cmp_local/" + ip_dir_name
-    else:
-        ip_cmp_path = cfg.sim_output_dir + "/" + sim_str + "/cmp_external/" + ip_dir_name
+    cmp_out_dir = cfg.sim_output_dir + "/" + sim_str + "/cmp_out/"
+    ip_cmp_path = cmp_out_dir + ip_dir_name
     
     if sim_job.simulator == common.simulators_enum.VIVADO:
         arg_list += def_list
@@ -378,6 +373,7 @@ def do_elaborate(ip, sim_job, wd):
             arg_list.append(f"-sv_lib {ip.vendor}__{ip.name}__{lib}.viv.so")
         
         launch_eda_bin(cfg.vivado_home + "/xelab", arg_list, wd, output=cfg.dbg)
+        
     elif sim_job.simulator == common.simulators_enum.VCS:
         arg_list += vcs_default_elaboration_args
         # TODO Add elaboration output argument for vcs
@@ -411,15 +407,23 @@ def do_elaborate(ip, sim_job, wd):
         arg_list += xcelium_default_elaboration_args
         # TODO Add elaboration output argument for nc
         launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd, output=cfg.dbg)
+        
     elif sim_job.simulator == common.simulators_enum.QUESTA:
+        for construct in ip.hdl_src_top_constructs:
+            if "." in construct:
+                arg_list.append(construct)
+            else:
+                arg_list.append(ip.name + "." + construct)
+        
         arg_list += questa_default_elaboration_args
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
-        arg_list.append(f"-work {ip.vendor}__{ip.name}")
         arg_list.append(f"-o {ip.vendor}__{ip.name}")
         arg_list.append(f"-l {elaboration_log_path}")
+        arg_list.append(f"-Ldir {cmp_out_dir}")
         launch_eda_bin(cfg.questa_home + "/vopt", arg_list, wd, output=cfg.dbg)
+        
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
         arg_list += riviera_default_elaboration_args
         # TODO Add elaboration output argument for riviera
@@ -580,7 +584,10 @@ def do_simulate(ip, sim_job, wd):
         
     elif sim_job.simulator == common.simulators_enum.QUESTA:
         arg_list += questa_default_simulation_args
-        # TODO Add simulation output argument for questa
+        arg_list += plus_args_list
+        arg_list.append("-l " + simulation_log_path)
+        arg_list.append("-sv_seed " + str(sim_job.seed))
+        arg_list.append(f" {ip.vendor}__{ip.name}")
         sem.release()
         launch_eda_bin(cfg.questa_home + "/vsim", arg_list, wd, output=output)
         

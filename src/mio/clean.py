@@ -47,12 +47,12 @@ def main(ip_str, deep_clean):
 
 def clean_core(core):
     common.info(f"Deleting code and compiled code objects for FuseSoC core '{core.sname}'")
-    common.remove_dir(cfg.sim_output_dir + '/viv/cmp_local/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/mtr/cmp_local/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_local/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_local/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/qst/cmp_local/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/riv/cmp_local/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/viv/cmp_out/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/mtr/cmp_out/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_out/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_out/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/qst/cmp_out/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/riv/cmp_out/@fsoc__' + core.sname)
     common.remove_dir(cfg.fsoc_dir + "/" + core_name)
     cfg.fsoc_cache[core_name]['installed'] = False
 
@@ -88,45 +88,27 @@ def clean_ip(ip, no_infos=False):
             common.dbg(f"Deleting compiled code objects for local IP '{ip_str}'")
         else:
             common.info(f"Deleting compiled code objects for local IP '{ip_str}'")
-        common.remove_dir(cfg.sim_output_dir + '/viv/cmp_local/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/mtr/cmp_local/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_local/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_local/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/qst/cmp_local/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/riv/cmp_local/' + ip_dir_name)
-        ip.is_compiled  [common.simulators_enum.VIVADO ] = False
-        ip.is_compiled  [common.simulators_enum.METRICS] = False
-        ip.is_compiled  [common.simulators_enum.VCS    ] = False
-        ip.is_compiled  [common.simulators_enum.XCELIUM] = False
-        ip.is_compiled  [common.simulators_enum.QUESTA ] = False
-        ip.is_compiled  [common.simulators_enum.RIVIERA] = False
-        ip.is_elaborated[common.simulators_enum.VIVADO ] = False
-        ip.is_elaborated[common.simulators_enum.METRICS] = False
-        ip.is_elaborated[common.simulators_enum.VCS    ] = False
-        ip.is_elaborated[common.simulators_enum.XCELIUM] = False
-        ip.is_elaborated[common.simulators_enum.QUESTA ] = False
-        ip.is_elaborated[common.simulators_enum.RIVIERA] = False
     else:
         if no_infos:
             common.dbg(f"Deleting compiled code objects for external IP '{ip_str}'")
         else:
             common.info(f"Deleting compiled code objects for external IP '{ip_str}'")
-        common.remove_dir(cfg.sim_output_dir + '/viv/cmp_external/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/mtr/cmp_external/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_external/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_external/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/qst/cmp_external/' + ip_dir_name)
-        common.remove_dir(cfg.sim_output_dir + '/riv/cmp_external/' + ip_dir_name)
-        ip.is_compiled  [common.simulators_enum.VIVADO ] = False
-        ip.is_compiled  [common.simulators_enum.METRICS] = False
-        ip.is_compiled  [common.simulators_enum.VCS    ] = False
-        ip.is_compiled  [common.simulators_enum.XCELIUM] = False
-        ip.is_compiled  [common.simulators_enum.QUESTA ] = False
-        ip.is_compiled  [common.simulators_enum.RIVIERA] = False
-        ip.is_elaborated[common.simulators_enum.VIVADO ] = False
-        ip.is_elaborated[common.simulators_enum.METRICS] = False
-        ip.is_elaborated[common.simulators_enum.VCS    ] = False
-        ip.is_elaborated[common.simulators_enum.XCELIUM] = False
-        ip.is_elaborated[common.simulators_enum.QUESTA ] = False
-        ip.is_elaborated[common.simulators_enum.RIVIERA] = False
+    common.remove_dir(cfg.sim_output_dir + '/viv/cmp_out/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/mtr/cmp_out/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_out/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_out/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/qst/cmp_out/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/riv/cmp_out/' + ip_dir_name)
+    ip.is_compiled  [common.simulators_enum.VIVADO ] = False
+    ip.is_compiled  [common.simulators_enum.METRICS] = False
+    ip.is_compiled  [common.simulators_enum.VCS    ] = False
+    ip.is_compiled  [common.simulators_enum.XCELIUM] = False
+    ip.is_compiled  [common.simulators_enum.QUESTA ] = False
+    ip.is_compiled  [common.simulators_enum.RIVIERA] = False
+    ip.is_elaborated[common.simulators_enum.VIVADO ] = False
+    ip.is_elaborated[common.simulators_enum.METRICS] = False
+    ip.is_elaborated[common.simulators_enum.VCS    ] = False
+    ip.is_elaborated[common.simulators_enum.XCELIUM] = False
+    ip.is_elaborated[common.simulators_enum.QUESTA ] = False
+    ip.is_elaborated[common.simulators_enum.RIVIERA] = False
     
