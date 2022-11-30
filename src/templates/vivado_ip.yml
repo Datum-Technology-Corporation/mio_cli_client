@@ -1,0 +1,42 @@
+## Copyright {{ year }} {{ name_of_copyright_owner }}
+## All rights reserved.
+########################################################################################################################
+
+
+ip:
+  name: "{{ name }}"
+  vendor: "{{ vendor }}"
+  version: "1.0.0"
+  full-name: "{{ full_name }}"
+  type: "RTL"
+  sub-type: "Vivado"
+  description: ""
+  home-page: ""
+  repo-uri: ""
+  bugs: ""
+  aliases: []
+  logo: ""
+  block-diagram: ""
+  languages: ["sv", "vhdl"]
+  simulators-supported:
+    viv: "^"
+  tags: []
+  copyright-holders: ["{{ name_of_copyright_owner }}"]
+  licenses: []
+
+dependencies: {}
+
+structure:
+   scripts-path : 
+   docs-path    : 
+   examples-path: 
+   src-path     : "{{ src_dir }}"
+
+hdl-src:
+  directories: [".", "srcs"]
+
+viv-project:
+  name: "{{ lib_name }}"
+  libs: ["xil_defaultlib"] # TODO Add Xilinx libs, usually found in 'xsim/elab.opt'
+  vlog: "vlog.prj"
+  vhdl: "vhdl.prj"

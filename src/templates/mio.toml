@@ -1,0 +1,9 @@
+## Copyright {{ year }} {{ name_of_copyright_owner }}
+## All rights reserved.
+########################################################################################################################
+
+
+[project]
+name        = "{{ name }}"
+full-name   = "{{ full_name }}"
+description = ""

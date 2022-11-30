@@ -1,0 +1,49 @@
+## Copyright {{ year }} {{ name_of_copyright_owner }}
+## All rights reserved.
+########################################################################################################################
+
+
+ip:
+  name: "{{ name }}"
+  vendor: "{{ vendor }}"
+  version: "1.0.0"
+  full-name: "{{ full_name }}"
+  type: "DV"
+  sub-type: "{% if has_dut %}TB{% endif %}"
+  sub-sub-type: ""
+  description: ""
+  home-page: ""
+  repo-uri: ""
+  bugs: ""
+  aliases: []
+  logo: ""
+  block-diagram: ""
+  languages: []
+  simulators-supported:
+    {{ simulator }}: "^"
+  tags: []
+  copyright-holders: ["{{ name_of_copyright_owner }}"]
+  licenses: []
+
+dependencies: {}
+
+{% if has_dut %}{% if fsoc %}dut:
+  ip-type: fsoc
+  name: "{{ dut_name }}"
+  full-name: "{{ fsoc_dut_full_name }}"
+  target: "{{ fsoc_dut_target }}"
+{% else %}dut: "{{ dut_name }}"{% endif %}
+{% endif %}
+structure:
+   scripts-path : "{{ bin_dir }}"
+   docs-path    : "{{ docs_dir }}"
+   examples-path: "{{ ex_dir }}"
+   src-path     : "{{ src_dir }}"
+
+hdl-src:
+  directories: ["."]
+  top-files: ["{{ top_file }}"]
+  so-libs: []
+{% if has_dut %}  top-constructs: ["{{ top_construct }}"]
+  tests-path: "."
+  test-name-template: "{{ '{{' }} name {{ '}}' }}"{% endif %}

@@ -1,0 +1,31 @@
+# Copyright 2022 Datum Technology Corporation
+# SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+########################################################################################################################
+
+# This file contains the built-in Moore.io CLI Client default configuration parameters
+# You can override these in your user config (~/.mio/mio.toml) or project config ($PROJECT_ROOT/mio.toml)
+
+
+[ip]
+global-paths = []
+paths = ["rtl", "dv"]
+
+[simulation]
+root-path                 = "sim"
+regressions-dir           = "regr"
+results-dir               = "results"
+test-result-path-template = "{{ ip_name }}_{{ test_name }}_{{ seed }}{% if args_present %}_{% for arg in args %}{{ arg }}{% endfor %}{% endif %}"
+default-simulator         = "viv"
+
+[lint]
+root-path = "lint"
+
+[synthesis]
+root-path = "syn"
+
+[encryption]
+vivado-key-path = ""
+
+[org]
+name = ""
+full-name = ""

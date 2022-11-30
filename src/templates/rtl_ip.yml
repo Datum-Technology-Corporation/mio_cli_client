@@ -1,0 +1,38 @@
+## Copyright {{ year }} {{ name_of_copyright_owner }}
+## All rights reserved.
+########################################################################################################################
+
+
+ip:
+  name: "{{ name }}"
+  vendor: "{{ vendor }}"
+  version: "1.0.0"
+  full-name: "{{ full_name }}"
+  type: "RTL"
+  sub-type: ""
+  description: ""
+  home-page: ""
+  repo-uri: ""
+  bugs: ""
+  aliases: []
+  logo: ""
+  block-diagram: ""
+  languages: []
+  simulators-supported:
+    {{ simulator }}: "^"
+  tags: []
+  copyright-holders: ["{{ name_of_copyright_owner }}"]
+  licenses: []
+
+dependencies: {}
+
+structure:
+   scripts-path : "{{ bin_dir }}"
+   docs-path    : "{{ docs_dir }}"
+   examples-path: "{{ ex_dir }}"
+   src-path     : "{{ src_dir }}"
+
+hdl-src:
+  directories: ["."]
+  top-files: ["{{ top_file }}"]
+  so-libs: []

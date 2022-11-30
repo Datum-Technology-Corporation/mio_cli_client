@@ -1,0 +1,23 @@
+# Copyright Datum Technology Corporation
+# SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+########################################################################################################################
+
+
+[ip]
+paths = ["tests/ip"]
+
+[org]
+name = "Datum"
+full-name = "Datum Technology Corporation"
+
+[project]
+name        = "mio_cli"
+full-name   = "Moore.io CLI Client"
+description = ""
+
+[simulation]
+root-path   = "tests/sim"
+default-simulator = "viv"
+
+[encryption]
+vivado-key-path = "bin/key.viv.txt"

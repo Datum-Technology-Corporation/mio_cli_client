@@ -1,0 +1,38 @@
+## Copyright {{ year }} {{ name_of_copyright_owner }}
+## All rights reserved.
+########################################################################################################################
+
+test-suite:
+   info:
+      name: Test Suite
+      ip: {{ name }}
+   target:
+      cmp-args : []
+      elab-args: []
+      sim-args : []
+   settings:
+      waves: [sanity, bugs]
+      cov  : [nightly, weekly]
+      verbosity:
+         sanity : high
+         nightly: medium
+         weekly : low
+         bugs   : debug
+      max-duration:
+         sanity :  1
+         nightly:  5
+         weekly : 12
+         bugs   :  1
+      max-jobs:
+         sanity :  5
+         nightly: 10
+         weekly : 20
+         bugs   :  1
+
+functional:
+   fixed: {}
+   rand: {}
+
+error:
+   fixed: {}
+   rand: {}

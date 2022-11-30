@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head title="{{ testsuites.name }}">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/js/bootstrap.min.js" integrity="sha384-PsUw7Xwds7x08Ew3exXhqzbhuEYmA2xnwc8BuD6SEr+UmEHlX8/MCltYEodzWA4u" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/css/bootstrap.min.css" integrity="sha384-uWxY/CJNBR+1zjPWmfnSnVxwRheevXITnMqoEIeG1LJrdI0GlVs/9cVSyPYXdcSF" crossorigin="anonymous">
+</head>
+<body>
+{% if testsuites.passed %}
+<h1>Simulation Test Results for {{ testsuites.name }} - <span style="font-weight: bold;">{{ testsuites.failures }} Failures</span> ({{ testsuites.timestamp }})</h1>
+{% else %}
+<h1>Simulation Test Results for {{ testsuites.name }} - <span style="font-weight: bold; color: red;">{{ testsuites.failures }} Failures</span> ({{ testsuites.timestamp }})</h1>
+{% endif %}
+{% for suite in testsuites.suites %}
+<div style="padding: 10px; background-color: #EEEEEE;">
+<h2>{{ suite.name }} - {{ suite.num_tests }} tests</h2>
+<h3><span style="color: red;">{{ suite.failures }} failing</span> - <span style="color: green;">{{ suite.passing }} passing</span></h3>
+<table class="table table-hover table-condensed" style="background-color: white;">
+<thead>
+<tr>
+<th>#</th>
+<th>Name</th>
+<th>Seed</th>
+<th>#Warnings</th>
+<th>#Errors</th>
+<th>Duration (sec)</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+{% for test in suite.tests %}
+{% if test.passed %}
+<tr>
+{% else %}
+<tr class="danger">
+{% endif %}
+<th>{{ test.index }}</th>
+<td>{{ test.name }}</td>
+<td>{{ test.seed }}</td>
+<td>{{ test.num_warnings }}</td>
+<td>{{ test.num_errors }}</td>
+<td>{{ test.time }}</td>
+<td>{{ test.conclusion }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endfor %}
+</body>
+</html>
