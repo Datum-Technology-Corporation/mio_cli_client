@@ -235,6 +235,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
     else:
         cmp_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_external/" + ip_dir_name
     sim_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_wd/" + ip_dir_name
+    common.create_dir(cmp_out)
     common.create_dir(sim_out)
     compilation_log_path = cfg.sim_dir + "/cmp/" + ip_dir_name + "." + sim_str + ".cmp.log"
     
