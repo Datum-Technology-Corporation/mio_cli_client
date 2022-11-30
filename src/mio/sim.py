@@ -145,7 +145,7 @@ def main(sim_job):
     if sim_job.compile:
         cmp_ip_count = cmp_ip_count + cmp_dependencies(ip, sim_job)
         if ip.has_dut:
-            if not ip.dut.is_compiled[sim_job.simulator]:
+            if not ip.dut.target_ip_model.is_compiled[sim_job.simulator]:
                 cmp_ip_count = cmp_ip_count + 1
                 if ip.dut_ip_type == "fsoc":
                     dut_str = f"{ip.dut_fsoc_name}"
