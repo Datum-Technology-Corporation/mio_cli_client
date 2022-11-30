@@ -27,7 +27,7 @@ vivado_default_compilation_args  = ["--incr", "-sv"]
 metrics_default_compilation_args = ["+acc+b"]
 vcs_default_compilation_args     = ["-lca", "-sverilog"]
 xcelium_default_compilation_args = []
-questa_default_compilation_args  = []
+questa_default_compilation_args  = ["-64"]
 riviera_default_compilation_args = []
 
 vivado_project_default_vlog_compilation_args = ["--relax"]
@@ -159,11 +159,10 @@ def elaborate(ip, sim_job):
         common.create_dir(cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name)
         common.create_dir(cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name + "/" + sim_job.regression_timestamp)
         elab_out =        cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name + "/" + sim_job.regression_timestamp
-        common.create_dir(elab_out)
     else:
         ip_dir_name = f"{ip.vendor}__{ip.name}"
         elab_out = cfg.sim_output_dir + "/" + sim_str + "/elab_out/single_sim/" + ip_dir_name
-    
+    common.create_dir(elab_out)
     timestamp_start = common.timestamp()
     log_file_path = do_elaborate(ip, sim_job, elab_out)
     timestamp_end = common.timestamp()
