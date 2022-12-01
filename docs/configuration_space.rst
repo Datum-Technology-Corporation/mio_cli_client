@@ -198,6 +198,17 @@ test-result-path-template
 `Jinja <https://palletsprojects.com/p/jinja/>`_ template used to generate the directory names for IP simulation test results.
 
 
+uvm-version
+***********
+
+- Required: Yes
+- Type: ``String``
+- Default: ``1.2``
+
+Specifies the version of UVM to be used during simulation.
+
+
+
 
 
 synthesis

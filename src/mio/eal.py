@@ -284,11 +284,11 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd=sim_out, output=cfg.dbg)
         
     elif sim_job.simulator == common.simulators_enum.QUESTA:
+        os.environ['UVM_HOME'] = f"$MODEL_TECH/../uvm-{cfg.uvm_version}"
         arg_list += questa_default_compilation_args
         arg_list.append(license_macros_file_path);
         arg_list.append("-f " + flist_path)
         arg_list += cmp_args_list
-        arg_list.append("-L uvm")
         arg_list += deps_list
         arg_list.append(f"-Ldir {cmp_out_dir}")
         arg_list.append("-l "  + compilation_log_path)
@@ -736,6 +736,9 @@ def gen_flist_file(simulator, ip_vendor, ip_name, path, defines, filelists, dire
     if simulator == common.simulators_enum.METRICS:
         directories.insert(0, "$UVM_HOME/src")
         files      .insert(0, "$UVM_HOME/src/uvm_pkg.sv")
+    if simulator == common.simulators_enum.QUESTA:
+        directories.insert(0, "$(UVM_HOME)/src")
+        files      .insert(0, "$(UVM_HOME)/src/uvm_pkg.sv")
     
     try:
         flist_template = cfg.templateEnv.get_template(f"{sim_str}.flist.j2")

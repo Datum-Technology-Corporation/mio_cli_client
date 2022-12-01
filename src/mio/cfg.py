@@ -44,6 +44,7 @@ global_ips_path = ""
 org_name      = ""
 org_full_name = ""
 default_simulator = common.simulators_enum.VIVADO
+uvm_version = ""
 
 pwd                   = ""
 temp_path             = ""
@@ -136,6 +137,7 @@ def load_configuration():
     global org_full_name
     global global_ips_path
     global default_simulator
+    global uvm_version
     
     project_name      = configuration.get("project", {}).get("name")
     #org_name          = user.user_data['org-name']
@@ -143,6 +145,7 @@ def load_configuration():
     sim_dir           = os.path.join(project_dir, configuration.get("simulation", {}).get("root-path"))
     sim_results_dir   = os.path.join(sim_dir    , configuration.get("simulation", {}).get("results-dir"))
     regr_results_dir  = os.path.join(sim_dir    , configuration.get("simulation", {}).get("regressions-dir"))
+    regr_results_dir  = os.path.join(sim_dir    , configuration.get("simulation", {}).get("uvm-version"))
     ip_paths          = configuration.get("ip", {}).get("paths")
     test_results_path_template = configuration.get("simulation", {}).get("test-result-path-template")
     encryption_key_path_vivado = configuration.get("encryption", {}).get("vivado-key-path")

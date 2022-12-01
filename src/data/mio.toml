@@ -16,6 +16,7 @@ regressions-dir           = "regr"
 results-dir               = "results"
 test-result-path-template = "{{ ip_name }}_{{ test_name }}_{{ seed }}{% if args_present %}_{% for arg in args %}{{ arg }}{% endfor %}{% endif %}"
 default-simulator         = "viv"
+uvm-version               = "1.2"
 
 [lint]
 root-path = "lint"
