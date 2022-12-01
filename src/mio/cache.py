@@ -221,6 +221,9 @@ class IP:
                     self.block_diagram = yml["ip"]["block-diagram"].strip()
                 if 'licensed' in yml["ip"]:
                     self.is_licensed = yml["ip"]["licensed"]
+                    if not self.name == "uvml_mio_lic":
+                        dep_model = Dependency(self, "@datum/uvml_mio_lic", "^")
+                        self.dependencies.append(dep_model)
                 
                 if 'aliases' in yml["ip"]:
                     for alias in yml["ip"]['aliases']:

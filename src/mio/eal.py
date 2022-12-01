@@ -244,7 +244,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list += cmp_args_list
         arg_list.append("-L uvm")
         arg_list += deps_list
-        arg_list.append(f"--work {vendor}__{name}={cmp_out}")
+        arg_list.append(f"--work {name}={cmp_out}")
         arg_list.append("--log "  + compilation_log_path)
         launch_eda_bin(cfg.vivado_home + "/xvlog", arg_list, wd=sim_out, output=cfg.dbg)
         
@@ -292,7 +292,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list += deps_list
         arg_list.append(f"-Ldir {cmp_out_dir}")
         arg_list.append("-l "  + compilation_log_path)
-        arg_list.append(f"-work {ip_dir_name}")
+        arg_list.append(f"-work {name}")
         launch_eda_bin(cfg.questa_home + "/vlog", arg_list, wd=sim_out, output=cfg.dbg)
         
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
@@ -352,6 +352,7 @@ def do_elaborate(ip, sim_job, wd):
     cmp_out_dir = cfg.sim_output_dir + "/" + sim_str + "/cmp_out/"
     ip_cmp_path = cmp_out_dir + ip_dir_name
     
+    
     if sim_job.simulator == common.simulators_enum.VIVADO:
         arg_list += def_list
         arg_list += elab_list
@@ -367,10 +368,19 @@ def do_elaborate(ip, sim_job, wd):
                 arg_list.append(ip.name + "." + construct)
         
         common.create_dir(wd)
+        arg_list.append(f"-sv_root {wd}") # Does this even do anything?
+        
+        for dep in ip.dependencies:
+            for so_lib in dep.target_ip_model.hdl_src_so_libs:
+                path_to_so_lib = f"{dep.target_ip_model.path}/{dep.target_ip_model.scripts_path}/{so_lib}.{sim_str}.so"
+                flat_name = f"{dep.target_ip_model.vendor}__{dep.target_ip_model.name}__{so_lib}.{sim_str}.so"
+                common.copy_file(path_to_so_lib, f"{wd}/{flat_name}")
+                arg_list.append(f"-sv_lib {flat_name}")
         for lib in ip.hdl_src_so_libs:
-            common.copy_file(f"{ip.path}/{ip.scripts_path}/{lib}.viv.so", f"{wd}/{ip.vendor}__{ip.name}__{lib}.viv.so") # Getting around vivado bug
-            arg_list.append(f"-sv_root {cfg.mio_data_src_dir}/dpi")
-            arg_list.append(f"-sv_lib {ip.vendor}__{ip.name}__{lib}.viv.so")
+            path_to_so_lib = f"{ip.path}/{ip.scripts_path}/{lib}.{sim_str}.so"
+            flat_name = f"{ip.vendor}__{ip.name}__{so_lib}.{sim_str}.so"
+            common.copy_file(path_to_so_lib, f"{wd}/{flat_name}")
+            arg_list.append(f"-sv_lib {flat_name}")
         
         launch_eda_bin(cfg.vivado_home + "/xelab", arg_list, wd, output=cfg.dbg)
         
@@ -419,7 +429,7 @@ def do_elaborate(ip, sim_job, wd):
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
-        arg_list.append(f"-o {ip.vendor}__{ip.name}")
+        arg_list.append(f"-o {ip.name}")
         arg_list.append(f"-l {elaboration_log_path}")
         arg_list.append(f"-Ldir {cmp_out_dir}")
         launch_eda_bin(cfg.questa_home + "/vopt", arg_list, wd, output=cfg.dbg)
@@ -587,7 +597,7 @@ def do_simulate(ip, sim_job, wd):
         arg_list += plus_args_list
         arg_list.append("-l " + simulation_log_path)
         arg_list.append("-sv_seed " + str(sim_job.seed))
-        arg_list.append(f" {ip.vendor}__{ip.name}")
+        arg_list.append(f" {ip.name}")
         sem.release()
         launch_eda_bin(cfg.questa_home + "/vsim", arg_list, wd, output=output)
         
@@ -613,7 +623,7 @@ def dut_elab_to_arg_list(ip, sim_job):
                     eda_yaml = yaml.load(edafile, Loader=SafeLoader)
                     if eda_yaml:
                         elab_options = eda_yaml['tool_options']['xsim']['xelab_options']
-                        args.append("-L " + fsoc_name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_local/@fsoc__" + ip.dut_name)
+                        args.append("-L " + fsoc_name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/@fsoc__" + ip.dut_name)
                     else:
                         common.fatal("ERROR: Unable to parse FuseSoC output " + eda_file_path)
             else:
@@ -633,11 +643,10 @@ def dut_elab_to_arg_list(ip, sim_job):
         else:
             if sim_job.simulator == common.simulators_enum.METRICS:
                 lib_str = f"-L {dut_ip.vendor}__{dut_ip.name}"
+            elif sim_job.simulator == common.simulators_enum.QUESTA:
+                lib_str = f"-L {dut_ip.vendor}__{dut_ip.name}"
             else:
-                if dut_ip.is_local:
-                    lib_str = "-L " + dut_ip.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_local/" + dut_ip_dir_name
-                else:
-                    lib_str = "-L " + dut_ip.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_external/" + dut_ip_dir_name
+                lib_str = "-L " + dut_ip.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/" + dut_ip_dir_name
             args.append(lib_str)
     common.dbg("DUT args list: " + str(args))
     return args
@@ -796,23 +805,19 @@ def convert_deps_to_args(deps, sim_job):
             elif sim_job.simulator == common.simulators_enum.QUESTA:
                 lib_str = f"-L {dep.vendor}__{dep.name}"
             else:
-                if dep.is_local:
-                    lib_str = "-L " + dep.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_local/" + dep_dir_name
-                else:
-                    lib_str = "-L " + dep.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_external/" + dep_dir_name
+                lib_str = "-L " + dep.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/" + dep_dir_name
             args.append(lib_str)
     return args
 
 
 def get_dep_list(ip, sim_job):
     final_dep_list = []
-    #final_dep_list.append(cache.get_ip("datum", "uvml_mio_lic", True))
     if ip.has_dut:
         if ip.dut_ip_type == "":
             final_dep_list.append(ip.dut.target_ip_model)
     dep_list = ip.get_ordered_deps()
     for dep in dep_list:
-        if dep.name == "uvm": # Not using UVM code for now
+        if dep.name == "uvm": # UVM is considered part of the simulator
             continue
         final_dep_list.append(dep)
     return final_dep_list

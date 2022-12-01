@@ -26,6 +26,7 @@ root-path = "syn"
 
 [encryption]
 vivado-key-path = ""
+metrics-key-path = ""
 
 [org]
 name = ""

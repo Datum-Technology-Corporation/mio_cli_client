@@ -157,7 +157,10 @@ def load_configuration():
     global_ips_path = configuration.get("ip", {}).get("global-paths")
     default_simulator_str = configuration.get("simulation", {}).get("default-simulator")
     
-    
+    if not encryption_key_path_vivado == None:
+        encryption_key_path_vivado = encryption_key_path_vivado.replace("~", user_dir)
+    if not encryption_key_path_metrics == None:
+        encryption_key_path_metrics = encryption_key_path_metrics.replace("~", user_dir)
     
     if default_simulator_str == "viv":
         default_simulator = common.simulators_enum.VIVADO

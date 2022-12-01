@@ -54,6 +54,18 @@ types contained therein.  Ex: DV IPs could be stored under ``rtl`` and vice-vers
 encryption
 ----------
 
+metrics-key-path
+***************
+
+- Required: Yes
+- Type: ``String``
+- Default: ``null``
+- Example: ``/tools/mtr.key``
+
+Absolute path to location of Metrics Cloud Simulator encryption key file.  This must be set in order to encrypt IP using vivado.
+See https://support.metrics.ca/hc/en-us/articles/360061975092-User-Guide-DSim-IEEE-1735-Encryption-In-Verilog for more information.
+
+
 vivado-key-path
 ***************
 
