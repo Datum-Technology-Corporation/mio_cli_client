@@ -244,7 +244,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list += cmp_args_list
         arg_list.append("-L uvm")
         arg_list += deps_list
-        arg_list.append("--work " + name + "=" + cmp_out)
+        arg_list.append(f"--work {vendor}__{name}={cmp_out}")
         arg_list.append("--log "  + compilation_log_path)
         launch_eda_bin(cfg.vivado_home + "/xvlog", arg_list, wd=sim_out, output=cfg.dbg)
         
@@ -292,7 +292,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list += deps_list
         arg_list.append(f"-Ldir {cmp_out_dir}")
         arg_list.append("-l "  + compilation_log_path)
-        arg_list.append(f"-work {cmp_out}")
+        arg_list.append(f"-work {ip_dir_name}")
         launch_eda_bin(cfg.questa_home + "/vlog", arg_list, wd=sim_out, output=cfg.dbg)
         
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
@@ -793,6 +793,8 @@ def convert_deps_to_args(deps, sim_job):
             dep_dir_name = f"{dep.vendor}__{dep.name}"
             if sim_job.simulator == common.simulators_enum.METRICS:
                 lib_str = f"-L {dep.vendor}__{dep.name}"
+            elif sim_job.simulator == common.simulators_enum.QUESTA:
+                lib_str = f"-L {dep.vendor}__{dep.name}"
             else:
                 if dep.is_local:
                     lib_str = "-L " + dep.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_local/" + dep_dir_name
@@ -967,7 +969,21 @@ def encrypt_tree(ip_name, location, app):
             f.close()
         except Exception as e:
             common.fatal(f"Failed to write encryption script to disk: {e}")
-        #launch_eda_bin(cfg.vivado_home + "/vivado", [f"-mode batch", f" -source {tcl_script_path}"], cfg.temp_path, False)
+        launch_eda_bin(cfg.vivado_home + "/vivado", [f"-mode batch", f" -source {tcl_script_path}"], cfg.temp_path, cfg.dbg)
+    elif app == "mtr":
+        if not os.path.exists(cfg.encryption_key_path_metrics):
+            common.fatal(f"Could not find metrics encryption key at '{cfg.encryption_key_path_metrics}'")
+        for file in files:
+            common.dbg(f"Processing file {file} ...")
+            file_r = open(file,mode='r')
+            file_text = file_r.read()
+            file_r.close()
+            file_w = open(file,mode='w')
+            file_w.write("`pragma protect begin\n")
+            file_w.write(file_text)
+            file_w.write("`pragma protect end")
+            file_w.close()
+            launch_eda_bin(cfg.metrics_home + "/dvlencrypt", [file, f"-i {cfg.encryption_key_path_metrics}", f"-o {file}"], cfg.temp_path, cfg.dbg)
     else:
         common.fatal("Only vivado is currently supported for encryption")
 

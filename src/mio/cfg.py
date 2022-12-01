@@ -69,6 +69,7 @@ regression_name = ""
 test_suite_name = ""
 test_results_path_template = ""
 encryption_key_path_vivado = ""
+encryption_key_path_metrics = ""
 
 templateLoader = jinja2.FileSystemLoader(searchpath=mio_template_dir)
 templateEnv    = jinja2.Environment(loader=templateLoader)
@@ -133,6 +134,7 @@ def load_configuration():
     global ip_paths
     global test_results_path_template
     global encryption_key_path_vivado
+    global encryption_key_path_metrics
     global org_name
     global org_full_name
     global global_ips_path
@@ -148,11 +150,14 @@ def load_configuration():
     regr_results_dir  = os.path.join(sim_dir    , configuration.get("simulation", {}).get("uvm-version"))
     ip_paths          = configuration.get("ip", {}).get("paths")
     test_results_path_template = configuration.get("simulation", {}).get("test-result-path-template")
-    encryption_key_path_vivado = configuration.get("encryption", {}).get("vivado-key-path")
+    encryption_key_path_vivado = configuration.get("encryption", {}).get("vivado-key-path").replace("~", user_dir)
+    encryption_key_path_metrics = configuration.get("encryption", {}).get("metrics-key-path").replace("~", user_dir)
     org_name = configuration.get("org", {}).get("name")
     org_full_name = configuration.get("org", {}).get("full-name")
     global_ips_path = configuration.get("ip", {}).get("global-paths")
     default_simulator_str = configuration.get("simulation", {}).get("default-simulator")
+    
+    
     
     if default_simulator_str == "viv":
         default_simulator = common.simulators_enum.VIVADO
@@ -166,6 +171,9 @@ def load_configuration():
         default_simulator = common.simulators_enum.QUESTA
     elif default_simulator_str == "riv":
         default_simulator = common.simulators_enum.RIVIERA
+    else:
+        common.warning(f"Default simulator selected ('{default_simulator_str}') is invalid.  Using vivado.")
+        default_simulator = common.simulators_enum.VIVADO
 
 
 
@@ -196,9 +204,18 @@ def load_tree():
     builtin_toml_file_path = os.path.join(mio_data_src_dir, "mio.toml")
     user_toml_file_path    = os.path.join(mio_user_dir    , "mio.toml")
     
-    configuration = toml.load(builtin_toml_file_path)
+    try:
+        configuration = toml.load(builtin_toml_file_path)
+    except Except as e:
+        common.fatal(f"Failed to parse Built-in Configuration ({builtin_toml_file_path}): {e}", False)
     if os.path.exists(user_toml_file_path):
-        common.merge_dict(configuration, toml.load(user_toml_file_path))
+        try:
+            common.merge_dict(configuration, toml.load(user_toml_file_path))
+        except Except as e:
+            common.fatal(f"Failed to parse User Configuration ({user_toml_file_path}): {e}", False)
         common.dbg("Found Moore.io user TOML Configuration file at " + user_toml_file_path)
-    common.merge_dict(configuration, toml.load(project_toml_file_path))
+    try:
+        common.merge_dict(configuration, toml.load(project_toml_file_path))
+    except Except as e:
+        common.fatal(f"Failed to parse Project Configuration ({project_toml_file_path}): {e}", False)
     common.dbg("Final configuration:\n" + toml.dumps(configuration))

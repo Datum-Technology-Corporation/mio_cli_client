@@ -101,8 +101,7 @@ def main():
         common.exit()
     if cli_args.command == 'package':
         cache.check_ip_str(cli_args.ip.lower())
-        cfg.target_ip_name = cli_args.ip
-        publish.cli_package_ip(cfg.target_ip_name, cli_args.dest, cli_args.no_tarball)
+        publish.cli_package_ip(cli_args.ip.lower(), cli_args.dest, cli_args.no_tarball)
         common.exit()
     if cli_args.command == 'publish':
         if (cli_args.username != None) and (cli_args.username != ""):

@@ -126,14 +126,16 @@ def do_publish_ip(ip_model, token, org):
         common.fatal(f"Could not find IP '{name}' on Moore.io IP Marketplace")
 
 
-def cli_package_ip(ip_name, destination, no_tarball):
-    ip_data = cache.get_ip(ip_name)['data']
-    encrypt = False
+def cli_package_ip(ip_str, destination, no_tarball):
+    vendor, name = common.parse_dep(ip_str)
+    if vendor == "":
+        ip = cache.get_anon_ip(name)
+    else:
+        ip = cache.get_ip(vendor, name)
     create_tarball = not no_tarball
-    if 'encrypted' in ip_data['hdl-src']:
-        encrypt = ip_data['hdl-src']['encrypted']
-    common.banner(f"Packaging IP '{ip_name}' ...")
-    path = package_ip(ip_name, encrypt, str(destination.resolve()), create_tarball)
+    common.banner(f"Packaging IP '{ip.vendor}/{ip.name}' ...")
+    update_shrinkwrap_file(ip, ip.is_licensed)
+    path = package_ip(ip, ip.is_licensed, str(destination.resolve()), create_tarball)
     if create_tarball:
         common.info(f"Compressed archive created at {path}")
     else:
