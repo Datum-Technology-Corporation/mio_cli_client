@@ -210,6 +210,16 @@ test-result-path-template
 `Jinja <https://palletsprojects.com/p/jinja/>`_ template used to generate the directory names for IP simulation test results.
 
 
+timescale
+*********
+
+- Required: Yes
+- Type: ``String``
+- Default: ``1ns/1ps``
+
+Simulation timescale specified to the simulator via command line.
+
+
 uvm-version
 ***********
 

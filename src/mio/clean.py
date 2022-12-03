@@ -25,8 +25,9 @@ def main(ip_str, deep_clean):
         for dep in ip.dependencies:
             dep_ip = cache.get_ip(dep.vendor, dep.target_ip)
             if dep_ip == None:
-                common.fatal(f"Cannot find Dependency IP '{dep.vendor}/{dep.target_ip}'")
-            clean_ip(dep_ip)
+                common.dbg(f"Cannot find Dependency IP '{dep.vendor}/{dep.target_ip}'")
+            else:
+                clean_ip(dep_ip)
     else:
         common.banner(f"Cleaning IP '{ip.vendor}/{ip.name}'")
     clean_ip(ip)

@@ -93,31 +93,16 @@ def main(sim_job):
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     common.dbg(f"Starting simulation job: '{sim_job.vendor}/{sim_job.ip}'")
     if sim_job.vendor == "":
-        ip = cache.get_anon_ip(sim_job.ip)
+        ip = cache.get_anon_ip(sim_job.ip, True)
     else:
-        ip = cache.get_ip(sim_job.vendor, sim_job.ip)
+        ip = cache.get_ip(sim_job.vendor, sim_job.ip, True)
     if ip == None:
         common.fatal(f"Cannot find IP '{sim_job.vendor}/{sim_job.ip}'")
     ip_str = f"{ip.vendor}/{ip.name}"
     
-    if not doctor.check_simulator_executables(sim_job.simulator):
-        common.fatal("Simulator '" + sim_job.simulator + "' not installed properly or environment variable missing")
-    
-    if sim_job.simulator == common.simulators_enum.METRICS:
-        eal.init_metrics_workspace()
-    
-    convert_cli_args_to_defines (sim_job)
-    convert_cli_args_to_plusargs(sim_job)
-    create_sim_directories()
-    
     if sim_job.compile:
-        is_installed = cache.is_ip_installed(ip.vendor, ip.name)
-        if not is_installed:
-            deps_to_install = []
-            for dep in ip.dependencies:
-                dep_ip = cache.get_ip(dep.vendor, dep.target_ip)
-                if dep_ip == None:
-                    deps_to_install.append(f"{dep.vendor}/{dep.target_ip}")
+        if not ip.are_deps_installed():
+            deps_to_install = ip.get_deps_to_install()
             if len(deps_to_install) > 0:
                 install_deps_str = ""
                 while (install_deps_str != "y") and (install_deps_str != "n"):
@@ -131,13 +116,25 @@ def main(sim_job):
                     else:
                         global_install = True
                     common.info(f"Installing {len(deps_to_install)} dependencies ...")
-                    try:
-                        install.install_ip_list(ip, deps_to_install, global_install)
-                    except Exception as e:
-                        common.fatal("Error during '" + ip_str + "' IP installation: " + str(e))
-                    cache.scan_and_load_ip_metadata()
+                    while len(deps_to_install) > 0:
+                        try:
+                            install.install_ip_dep_list(ip, deps_to_install, global_install)
+                        except Exception as e:
+                            common.fatal("Error during '" + ip_str + "' IP installation: " + str(e))
+                        cache.scan_and_load_ip_metadata()
+                        deps_to_install = ip.get_deps_to_install()
                 else:
                     common.fatal("Cannot continue without first installing '" + ip_str + "' IP dependencies.")
+    
+    if not doctor.check_simulator_executables(sim_job.simulator):
+        common.fatal("Simulator '" + sim_job.simulator + "' not installed properly or environment variable missing")
+    
+    if sim_job.simulator == common.simulators_enum.METRICS:
+        eal.init_metrics_workspace()
+    
+    convert_cli_args_to_defines (sim_job)
+    convert_cli_args_to_plusargs(sim_job)
+    create_sim_directories()
     
     check_dependencies(ip)
     cmp_ip_count = 0
@@ -436,6 +433,8 @@ def check_dependencies(ip):
         found_ip = cache.get_ip(dep.vendor, dep.target_ip)
         if found_ip == None:
             common.fatal(f"Could not find IP dependency '{dep.vendor}/{dep.target_ip}'")
+        else:
+            check_dependencies(found_ip)
 
 
 def cmp_dependencies(ip, sim_job):
@@ -445,6 +444,7 @@ def cmp_dependencies(ip, sim_job):
     deps = ip.get_ordered_deps()
     deps_to_cmp = []
     for dep in deps:
+        common.dbg(f"Processing dep {dep.vendor}/{dep.name} to be compiled")
         if dep.name == "uvm":
             continue
         if not dep.is_compiled[sim_job.simulator]:

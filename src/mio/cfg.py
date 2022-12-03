@@ -65,6 +65,7 @@ user_file_path        = mio_user_dir + "/user.yml"
 builtin_ip_path       = ""
 user_mio_file         = mio_user_dir + "/mio.toml"
 
+sim_timescale   = ""
 regression_name = ""
 test_suite_name = ""
 test_results_path_template = ""
@@ -140,6 +141,7 @@ def load_configuration():
     global global_ips_path
     global default_simulator
     global uvm_version
+    global sim_timescale
     
     project_name      = configuration.get("project", {}).get("name")
     #org_name          = user.user_data['org-name']
@@ -147,15 +149,19 @@ def load_configuration():
     sim_dir           = os.path.join(project_dir, configuration.get("simulation", {}).get("root-path"))
     sim_results_dir   = os.path.join(sim_dir    , configuration.get("simulation", {}).get("results-dir"))
     regr_results_dir  = os.path.join(sim_dir    , configuration.get("simulation", {}).get("regressions-dir"))
-    regr_results_dir  = os.path.join(sim_dir    , configuration.get("simulation", {}).get("uvm-version"))
-    ip_paths          = configuration.get("ip", {}).get("paths")
-    test_results_path_template = configuration.get("simulation", {}).get("test-result-path-template")
-    encryption_key_path_vivado = configuration.get("encryption", {}).get("vivado-key-path").replace("~", user_dir)
-    encryption_key_path_metrics = configuration.get("encryption", {}).get("metrics-key-path").replace("~", user_dir)
-    org_name = configuration.get("org", {}).get("name")
-    org_full_name = configuration.get("org", {}).get("full-name")
+    uvm_version                = configuration.get("simulation", {}).get("uvm-version").strip()
+    sim_timescale              = configuration.get("simulation", {}).get("timescale").strip()
+    test_results_path_template = configuration.get("simulation", {}).get("test-result-path-template").strip()
+    default_simulator_str      = configuration.get("simulation", {}).get("default-simulator").strip()
+    
+    encryption_key_path_vivado  = configuration.get("encryption", {}).get("vivado-key-path" ).strip().replace("~", user_dir)
+    encryption_key_path_metrics = configuration.get("encryption", {}).get("metrics-key-path").strip().replace("~", user_dir)
+    
+    org_name      = configuration.get("org", {}).get("name").strip()
+    org_full_name = configuration.get("org", {}).get("full-name").strip()
+    
     global_ips_path = configuration.get("ip", {}).get("global-paths")
-    default_simulator_str = configuration.get("simulation", {}).get("default-simulator")
+    ip_paths        = configuration.get("ip", {}).get("paths")
     
     if not encryption_key_path_vivado == None:
         encryption_key_path_vivado = encryption_key_path_vivado.replace("~", user_dir)

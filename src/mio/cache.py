@@ -155,21 +155,21 @@ class IP:
         self.simulators_supported[common.simulators_enum.XCELIUM] = ""
         self.simulators_supported[common.simulators_enum.QUESTA ] = ""
         self.simulators_supported[common.simulators_enum.RIVIERA] = ""
-        self.tags                       = []
-        self.copyright_holders          = []
-        self.licenses                   = []
-        self.scripts_path               = ""
-        self.docs_path                  = ""
-        self.examples_path              = ""
-        self.src_path                   = ""
-        self.dependencies               = []
-        self.hdl_src_directories        = []
-        self.hdl_src_top_files          = []
-        self.hdl_src_top_constructs     = []
-        self.hdl_src_so_libs            = []
-        self.hdl_src_tests_path         = ""
-        self.hdl_src_test_name_template = ""
-        self.hdl_src_flists             = {}
+        self.tags                        = []
+        self.copyright_holders           = []
+        self.licenses                    = []
+        self.scripts_path                = ""
+        self.docs_path                   = ""
+        self.examples_path               = ""
+        self.src_path                    = ""
+        self.dependencies                = []
+        self.hdl_src_directories         = []
+        self.hdl_src_top_files           = []
+        self.hdl_src_top_constructs      = []
+        self.hdl_src_so_libs             = []
+        self.hdl_src_tests_path          = ""
+        self.hdl_src_test_name_template  = ""
+        self.hdl_src_flists              = {}
         self.hdl_src_flists[common.simulators_enum.VIVADO ] = ""
         self.hdl_src_flists[common.simulators_enum.METRICS] = ""
         self.hdl_src_flists[common.simulators_enum.VCS    ] = ""
@@ -221,9 +221,6 @@ class IP:
                     self.block_diagram = yml["ip"]["block-diagram"].strip()
                 if 'licensed' in yml["ip"]:
                     self.is_licensed = yml["ip"]["licensed"]
-                    if not self.name == "uvml_mio_lic":
-                        dep_model = Dependency(self, "@datum/uvml_mio_lic", "^")
-                        self.dependencies.append(dep_model)
                 
                 if 'aliases' in yml["ip"]:
                     for alias in yml["ip"]['aliases']:
@@ -329,6 +326,10 @@ class IP:
                     else:
                         raise Exception(f"Malformed dut section")
                 
+                if (self.is_licensed == True) and (self.is_encrypted == True):
+                    if not ((self.vendor == "datum") and (self.name == "uvml_mio_lic")):
+                        dep_model = Dependency(self, "@datum/uvml_mio_lic", "^")
+                        self.dependencies.append(dep_model)
         except Exception as e:
             common.warning("IP file " + ip_yml_path + " is malformed and will be ignored: " + str(e))
     
@@ -526,6 +527,8 @@ class IP:
         needs_update = False
         if self.is_local:
             for dep in self.dependencies:
+                if dep.target_ip_model == None:
+                    common.fatal(f"Dependency '{dep.vendor}/{dep.target_ip}' is null!")
                 dep.target_ip_model.update_is_compiled_elaborated(simulator)
                 if not dep.target_ip_model.is_compiled[simulator]:
                     needs_update = True
@@ -540,7 +543,7 @@ class IP:
                 self.reset_is_compiled_elaborated()
     
     def resolve_dependencies(self):
-        # TODO Move to using poetry for resolving dependencies
+        common.dbg(f"Resolving dependencies for IP '{self.vendor}/{self.name}'")
         if self.dut != None:
             self.dut.resolve()
             self.dut_vendor = self.dut.target_ip_model.vendor
@@ -553,12 +556,57 @@ class IP:
         self.dependencies.sort(key= get_key)
         for dep in self.dependencies:
             common.dbg(f"Processing dependency '{dep.vendor}/{dep.target_ip}'")
+            deps_deps_list = dep.target_ip_model.get_ordered_deps()
+            deps_list += deps_deps_list
             deps_list.append(dep.target_ip_model)
-        return deps_list
+        unique_deps = []
+        for dep in deps_list:
+            if dep not in unique_deps:
+                unique_deps.append(dep)
+        return unique_deps
+    
+    def get_deps_to_install(self):
+        deps = []
+        for dep in self.dependencies:
+            dep_ip = get_ip(dep.vendor, dep.target_ip)
+            if dep_ip == None:
+                deps.append(f"{dep.vendor}/{dep.target_ip}")
+            else:
+                deps += dep_ip.get_deps_to_install()
+        unique_deps = []
+        for dep in deps:
+            if dep not in unique_deps:
+                unique_deps.append(dep)
+        return unique_deps
+    
+    def get_total_deps(self):
+        total_deps = 0
+        for dep in self.dependencies:
+            total_deps += 1
+            if not dep.target_ip_model == None:
+                total_deps += dep.target_ip_model.get_total_deps()
+        return total_deps
+    
+    def are_deps_installed(self):
+        is_installed = True
+        for dep in self.dependencies:
+            common.dbg(f"Checking dependency '{dep.vendor}/{dep.target_ip}' to see if it's installed")
+            dep_ip = get_ip(dep.vendor, dep.target_ip)
+            if dep_ip == None:
+                is_installed = False
+                break
+            else:
+                dep_is_installed = dep_ip.are_deps_installed()
+                if not dep_is_installed:
+                    is_installed = False
+                    break
+        return is_installed
 
 
 def get_key(obj):
-    return len(obj.target_ip_model.dependencies)
+    if obj.target_ip_model == None:
+        common.fatal(f"Dependency '{obj.target_ip}' is null!")
+    return obj.target_ip_model.get_total_deps()
 
 
 class Dependency:
@@ -571,6 +619,7 @@ class Dependency:
         self.semver    = semver
         self.owner_ip  = owner_ip
         self.target_ip_model = None
+        common.dbg(f"Dependency after parsing: vendor='{self.vendor}' , target_ip='{self.target_ip}'")
 
     def parse_dep_string(self, string):
         regex = "\@((?:\w|\d|\_|\-)+)\/((?:\w|\d|\_)+)"
@@ -587,11 +636,13 @@ class Dependency:
             self.vendor = ""
     
     def resolve(self):
+        common.dbg(f"Dep '{self.vendor}/{self.target_ip}' resolving ...")
         if self.vendor == "":
             self.target_ip_model = get_anon_ip(self.target_ip)
         else:
             self.target_ip_model = get_ip(self.vendor, self.target_ip)
         if self.target_ip_model != None:
+            common.dbg(f"Dep '{self.vendor}/{self.target_ip}' resolved!")
             self.vendor = self.target_ip_model.vendor
             self.semver = self.target_ip_model.version
 
@@ -605,19 +656,6 @@ def check_ip(vendor, name):
         common.fatal(f"Could not find target IP {vendor}/{name}")
 
 
-def is_ip_installed(vendor, name):
-    is_installed = True
-    ip = get_ip(vendor, name)
-    if ip == None:
-        return False
-    for dep in ip.dependencies:
-        dep_ip = get_ip(dep.vendor, dep.target_ip)
-        if dep_ip == None:
-            is_installed = False
-            break
-    return is_installed
-
-
 def check_ip_str(ip_str):
     vendor, name = common.parse_dep(ip_str)
     if vendor == "":
@@ -628,33 +666,35 @@ def check_ip_str(ip_str):
         common.fatal(f"Could not find target IP {vendor}/{name}")
 
 
-def get_ip(vendor, ip, fail_if_not_found=False):
-    found_ip = None
+def get_ip(vendor, ip_name, fail_if_not_found=False):
+    found_ip = False
+    ip = None
     if vendor in ip_cache:
-        if ip in ip_cache[vendor]:
-            found_ip = ip_cache[vendor][ip]
-    if found_ip == None:
-        if fail_if_not_found:
-            common.fatal(f"Cannot find IP '{vendor}/{ip}'.")
+        if ip_name in ip_cache[vendor]:
+            found_ip = True
+            ip = ip_cache[vendor][ip_name]
         else:
-            return found_ip
+            common.dbg(f"IP '{ip_name}' not found in vendor '{vendor}' cache!")
     else:
-        return found_ip
+        common.dbg(f"Vendor '{vendor}' not found in cache!")
+    if found_ip == False:
+        if fail_if_not_found:
+            common.fatal(f"Cannot find IP '{vendor}/{ip_name}'.")
+    return ip
 
 
-def get_anon_ip(name, fail_if_not_found=False):
-    found_ip = None
+def get_anon_ip(ip_name, fail_if_not_found=False):
+    found_ip = False
+    ip = None
     for vendor in ip_cache:
-        if name in ip_cache[vendor]:
-            found_ip = ip_cache[vendor][name]
+        if ip_name in ip_cache[vendor]:
+            found_ip = True
+            ip = ip_cache[vendor][ip_name]
             break
-    if found_ip == None:
+    if found_ip == False:
         if fail_if_not_found:
-            common.fatal(f"Cannot find IP '{name}'.")
-        else:
-            return found_ip
-    else:
-        return found_ip
+            common.fatal(f"Cannot find IP '{ip_name}'.")
+    return ip
 
 
 def get_core(core_name):

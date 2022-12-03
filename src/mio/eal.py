@@ -101,7 +101,6 @@ def compile_fsoc_core(flist_path, core, sim_job):
 def compile_ip(ip, sim_job):
     ip_str = f"{ip.vendor}/{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
-    
     flist_path = get_ip_flist_path(ip, sim_job)
     deps_list  = get_dep_list(ip, sim_job)
     if ip.is_encrypted:
@@ -266,6 +265,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list.append("-F " + flist_path)
         mtr_compilation_log_path = ip_dir_name + "." + sim_str + ".cmp.log"
         arg_list.append("-l " + mtr_compilation_log_path)
+        arg_list.append(f"-timescale {cfg.sim_timescale}")
         
         arg_list_str = ""
         for arg in arg_list:
@@ -284,7 +284,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd=sim_out, output=cfg.dbg)
         
     elif sim_job.simulator == common.simulators_enum.QUESTA:
-        os.environ['UVM_HOME'] = f"$MODEL_TECH/../uvm-{cfg.uvm_version}"
+        os.environ['MIO_UVM_HOME'] = f"$MIO_QUESTA_HOME/../verilog_src/uvm-{cfg.uvm_version}"
         arg_list += questa_default_compilation_args
         arg_list.append(license_macros_file_path);
         arg_list.append("-f " + flist_path)
@@ -348,6 +348,7 @@ def do_elaborate(ip, sim_job, wd):
     elab_list = convert_elaboration_args(sim_job)
     deps_ip_list = get_dep_list(ip, sim_job)
     deps_list = convert_deps_to_args(deps_ip_list, sim_job)
+    so_libs = get_all_so_libs(ip, sim_job)
     elaboration_log_path = cfg.sim_dir + "/elab/" + ip_dir_name + "." + sim_str + ".elab.log"
     cmp_out_dir = cfg.sim_output_dir + "/" + sim_str + "/cmp_out/"
     ip_cmp_path = cmp_out_dir + ip_dir_name
@@ -368,19 +369,11 @@ def do_elaborate(ip, sim_job, wd):
                 arg_list.append(ip.name + "." + construct)
         
         common.create_dir(wd)
-        arg_list.append(f"-sv_root {wd}") # Does this even do anything?
+        arg_list.append(f"-sv_root {wd}")
         
-        for dep in ip.dependencies:
-            for so_lib in dep.target_ip_model.hdl_src_so_libs:
-                path_to_so_lib = f"{dep.target_ip_model.path}/{dep.target_ip_model.scripts_path}/{so_lib}.{sim_str}.so"
-                flat_name = f"{dep.target_ip_model.vendor}__{dep.target_ip_model.name}__{so_lib}.{sim_str}.so"
-                common.copy_file(path_to_so_lib, f"{wd}/{flat_name}")
-                arg_list.append(f"-sv_lib {flat_name}")
-        for lib in ip.hdl_src_so_libs:
-            path_to_so_lib = f"{ip.path}/{ip.scripts_path}/{lib}.{sim_str}.so"
-            flat_name = f"{ip.vendor}__{ip.name}__{so_lib}.{sim_str}.so"
-            common.copy_file(path_to_so_lib, f"{wd}/{flat_name}")
-            arg_list.append(f"-sv_lib {flat_name}")
+        for so_lib in so_libs:
+            common.copy_file(so_libs[so_lib], f"{wd}/{so_lib}")
+            arg_list.append(f"-sv_lib {so_lib}")
         
         launch_eda_bin(cfg.vivado_home + "/xelab", arg_list, wd, output=cfg.dbg)
         
@@ -394,6 +387,7 @@ def do_elaborate(ip, sim_job, wd):
         mtr_elaboration_log_path = ip_dir_name + "." + sim_str + ".elab.log"
         arg_list.append(f"-genimage {ip.vendor}__{ip.name}")
         arg_list.append(f"-l {mtr_elaboration_log_path}")
+        arg_list.append(f"-timescale {cfg.sim_timescale}")
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
@@ -429,6 +423,7 @@ def do_elaborate(ip, sim_job, wd):
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
+        arg_list.append(f"-work {ip_dir_name}")
         arg_list.append(f"-o {ip.name}")
         arg_list.append(f"-l {elaboration_log_path}")
         arg_list.append(f"-Ldir {cmp_out_dir}")
@@ -533,10 +528,19 @@ def do_simulate(ip, sim_job, wd):
     plus_args["SIM_DIR_RESULTS"                ] = cfg.sim_results_dir
     plus_args["UVM_VERBOSITY"                  ] = "UVM_" + sim_job.verbosity.upper()
     plus_args["UVM_MAX_QUIT_COUNT"             ] = str(sim_job.max_errors)
-    plus_args["UVMX_FILE_BASE_DIR_SIM"         ] = cfg.sim_dir
-    plus_args["UVMX_FILE_BASE_DIR_TB"          ] = ip.path + "/" + ip.src_path
-    plus_args["UVMX_FILE_BASE_DIR_TESTS"       ] = ip.path + "/" + ip.src_path + "/" + ip.hdl_src_tests_path
-    plus_args["UVMX_FILE_BASE_DIR_TEST_RESULTS"] = tests_results_path
+    
+    if sim_job.simulator == common.simulators_enum.METRICS:
+        plus_args["UVMX_FILE_BASE_DIR_SIM"         ] = "./.mio/temp"
+        plus_args["UVMX_FILE_BASE_DIR_TEST_RESULTS"] = "./.mio/temp"
+        common.create_dir(cfg.temp_path + "/trn_log")
+        plus_args["UVMX_FILE_BASE_DIR_TB"          ] = os.path.relpath(ip.path + "/" + ip.src_path, cfg.project_dir)
+        plus_args["UVMX_FILE_BASE_DIR_TESTS"       ] = os.path.relpath(ip.path + "/" + ip.src_path + "/" + ip.hdl_src_tests_path, cfg.project_dir)
+    else:
+        plus_args["UVMX_FILE_BASE_DIR_SIM"         ] = cfg.sim_dir
+        plus_args["UVMX_FILE_BASE_DIR_TEST_RESULTS"] = tests_results_path
+        plus_args["UVMX_FILE_BASE_DIR_TB"          ] = ip.path + "/" + ip.src_path
+        plus_args["UVMX_FILE_BASE_DIR_TESTS"       ] = ip.path + "/" + ip.src_path + "/" + ip.hdl_src_tests_path
+    
     plus_args_list = convert_plus_args(sim_job)
     if sim_job.simulator == common.simulators_enum.VIVADO:
         arg_list += plus_args_list
@@ -569,6 +573,7 @@ def do_simulate(ip, sim_job, wd):
         arg_list.append("-sv_seed " + str(sim_job.seed))
         arg_list.append(f"-image {ip.vendor}__{ip.name}")
         arg_list.append(f"-sv_lib %UVM_HOME%/src/dpi/libuvm_dpi.so")
+        arg_list.append(f"-timescale {cfg.sim_timescale}")
         #arg_list.append(f"-work {ip.vendor}__{ip.name}")
         
         arg_list_str = ""
@@ -715,19 +720,28 @@ def gen_flist(ip, sim_job):
     for dir in ip.hdl_src_directories:
         if dir == ".":
             if sim_job.simulator == common.simulators_enum.METRICS:
-                directories.append(f"{rel_ip_path}/{ip.src_path}")
+                if ip.is_encrypted:
+                    directories.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}")
+                else:
+                    directories.append(f"{rel_ip_path}/{ip.src_path}")
             else:
                 directories.append("${MIO_" + ip.name.upper() + "_SRC_PATH}")
         else:
             if sim_job.simulator == common.simulators_enum.METRICS:
-                directories.append(f"{rel_ip_path}/{ip.src_path}/{dir}")
+                if ip.is_encrypted:
+                    directories.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}/{dir}")
+                else:
+                    directories.append(f"{rel_ip_path}/{ip.src_path}/{dir}")
             else:
                 directories.append("${MIO_" + ip.name.upper() + "_SRC_PATH}/" + dir)
     
     top_files = []
     for file in ip.hdl_src_top_files:
         if sim_job.simulator == common.simulators_enum.METRICS:
-            top_files.append(f"{rel_ip_path}/{ip.src_path}/{file}")
+            if ip.is_encrypted:
+                top_files.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}/{file}")
+            else:
+                top_files.append(f"{rel_ip_path}/{ip.src_path}/{file}")
         else:
             top_files.append("${MIO_" + ip.name.upper() + "_SRC_PATH}/" + file)
     
@@ -746,8 +760,8 @@ def gen_flist_file(simulator, ip_vendor, ip_name, path, defines, filelists, dire
         directories.insert(0, "$UVM_HOME/src")
         files      .insert(0, "$UVM_HOME/src/uvm_pkg.sv")
     if simulator == common.simulators_enum.QUESTA:
-        directories.insert(0, "$(UVM_HOME)/src")
-        files      .insert(0, "$(UVM_HOME)/src/uvm_pkg.sv")
+        directories.insert(0, "$(MIO_UVM_HOME)/src")
+        files      .insert(0, "$(MIO_UVM_HOME)/src/uvm_pkg.sv")
     
     try:
         flist_template = cfg.templateEnv.get_template(f"{sim_str}.flist.j2")
@@ -801,9 +815,9 @@ def convert_deps_to_args(deps, sim_job):
         if dep.name != "uvm":
             dep_dir_name = f"{dep.vendor}__{dep.name}"
             if sim_job.simulator == common.simulators_enum.METRICS:
-                lib_str = f"-L {dep.vendor}__{dep.name}"
+                lib_str = f"-L {dep_dir_name}"
             elif sim_job.simulator == common.simulators_enum.QUESTA:
-                lib_str = f"-L {dep.vendor}__{dep.name}"
+                lib_str = f"-L {dep_dir_name}"
             else:
                 lib_str = "-L " + dep.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/" + dep_dir_name
             args.append(lib_str)
@@ -839,6 +853,19 @@ def get_incdir_list(deps, sim_job):
                     src_path = os.path.relpath(src_path, cfg.project_dir)
                 incdir_list.append("+incdir+" + src_path)
     return incdir_list
+
+
+def get_all_so_libs(ip, sim_job):
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
+    so_libs = {}
+    for dep in ip.dependencies:
+        dep_so_libs = get_all_so_libs(dep.target_ip_model, sim_job)
+        common.merge_dict(so_libs, dep_so_libs)
+    for so_lib in ip.hdl_src_so_libs:
+        so_lib_flat_name = f"{ip.vendor}__{ip.name}__{so_lib}.{sim_str}.so"
+        so_lib_path = f"{ip.path}/{ip.scripts_path}/{so_lib}.{sim_str}.so"
+        so_libs[so_lib_flat_name] = so_lib_path
+    return so_libs
 
 
 def convert_compilation_args(sim_job):
@@ -976,19 +1003,36 @@ def encrypt_tree(ip_name, location, app):
             common.fatal(f"Failed to write encryption script to disk: {e}")
         launch_eda_bin(cfg.vivado_home + "/vivado", [f"-mode batch", f" -source {tcl_script_path}"], cfg.temp_path, cfg.dbg)
     elif app == "mtr":
+        # TEMPORARY SOLUTION FROM METRICS UNTIL DVLENCRYPT IS SHIPPED WITH DSIM
         if not os.path.exists(cfg.encryption_key_path_metrics):
-            common.fatal(f"Could not find metrics encryption key at '{cfg.encryption_key_path_metrics}'")
+            common.fatal(f"Could not find vivado encryption key at '{cfg.encryption_key_path_metrics}'")
+        
+        tcl_script += f"encrypt -key {cfg.encryption_key_path_metrics} -lang ver "  # TODO Add support for VHDL files
         for file in files:
-            common.dbg(f"Processing file {file} ...")
-            file_r = open(file,mode='r')
-            file_text = file_r.read()
-            file_r.close()
-            file_w = open(file,mode='w')
-            file_w.write("`pragma protect begin\n")
-            file_w.write(file_text)
-            file_w.write("`pragma protect end")
-            file_w.close()
-            launch_eda_bin(cfg.metrics_home + "/dvlencrypt", [file, f"-i {cfg.encryption_key_path_metrics}", f"-o {file}"], cfg.temp_path, cfg.dbg)
+            tcl_script += f"{file} "
+        common.dbg(f"TCL Script being passed to vivado for encryption: '\n{tcl_script}'")
+        tcl_script_path = cfg.temp_path + "/" + ip_name + ".encrypt.viv.tcl"
+        try:
+            f = open(tcl_script_path, "w")
+            f.write(tcl_script)
+            f.close()
+        except Exception as e:
+            common.fatal(f"Failed to write encryption script to disk: {e}")
+        launch_eda_bin(cfg.vivado_home + "/vivado", [f"-mode batch", f" -source {tcl_script_path}"], cfg.temp_path, cfg.dbg)
+    #elif app == "mtr":
+    #    if not os.path.exists(cfg.encryption_key_path_metrics):
+    #        common.fatal(f"Could not find metrics encryption key at '{cfg.encryption_key_path_metrics}'")
+    #    for file in files:
+    #        common.dbg(f"Processing file {file} ...")
+    #        file_r = open(file,mode='r')
+    #        file_text = file_r.read()
+    #        file_r.close()
+    #        file_w = open(file,mode='w')
+    #        file_w.write("`pragma protect begin\n")
+    #        file_w.write(file_text)
+    #        file_w.write("`pragma protect end")
+    #        file_w.close()
+    #        launch_eda_bin(cfg.metrics_home + "/dvlencrypt", [file, f"-i {cfg.encryption_key_path_metrics}", f"-o {file}"], cfg.temp_path, cfg.dbg)
     else:
         common.fatal("Only vivado is currently supported for encryption")
 

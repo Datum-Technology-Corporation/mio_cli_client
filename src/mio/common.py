@@ -142,8 +142,11 @@ def dir_timestamp(path):
                 modTimesinceEpoc = statbuf.st_mtime
             modificationTime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(modTimesinceEpoc))
             timestamps.append(modificationTime)
-    latest_timestamp = max(timestamps)
-    latest_timestamp_str = datetime.strptime(latest_timestamp, '%Y-%m-%d %H:%M:%S')
+    if len(timestamps) > 0:
+        latest_timestamp = max(timestamps)
+        latest_timestamp_str = datetime.strptime(latest_timestamp, '%Y-%m-%d %H:%M:%S')
+    else:
+        latest_timestamp_str = timestamp()
     return latest_timestamp_str
 
 
