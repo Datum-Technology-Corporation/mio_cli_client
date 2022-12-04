@@ -763,7 +763,7 @@ def scan_and_load_ip_metadata():
     for ip_path in cfg.global_ips_path:
         full_ip_path = os.path.join(cfg.project_dir, ip_path)
         find_fsoc_cores(full_ip_path)
-        find_external_ip_files(full_ip_path)
+        find_external_ip_files(full_ip_path, True)
     for ip_path in cfg.ip_paths:
         full_ip_path = os.path.join(cfg.project_dir, ip_path)
         find_fsoc_cores(full_ip_path)

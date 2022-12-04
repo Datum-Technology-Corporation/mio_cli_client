@@ -100,13 +100,22 @@ def compile_fsoc_core(flist_path, core, sim_job):
 
 def compile_ip(ip, sim_job):
     ip_str = f"{ip.vendor}/{ip.name}"
+    ip_dir = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     flist_path = get_ip_flist_path(ip, sim_job)
     deps_list  = get_dep_list(ip, sim_job)
-    if ip.is_encrypted:
-        path = ip.path + "/" + ip.src_path + "." + sim_str
+    if ip.is_global and (sim_job.simulator == common.simulators_enum.METRICS):
+        if ip.is_encrypted:
+            common.copy_directory(ip.path + "/" + ip.src_path + "." + sim_str, f"{cfg.temp_path}/{ip_dir}")
+            path = ".mio/temp/" + ip_dir
+        else:
+            common.copy_directory(ip.path + "/" + ip.src_path, f"{cfg.temp_path}/{ip_dir}")
+            path = ".mio/temp/" + ip_dir
     else:
-        path = ip.path + "/" + ip.src_path
+        if ip.is_encrypted:
+            path = ip.path + "/" + ip.src_path + "." + sim_str
+        else:
+            path = ip.path + "/" + ip.src_path
     
     if sim_job.simulator == common.simulators_enum.METRICS:
         flist_path = os.path.relpath(flist_path, cfg.project_dir)
@@ -190,9 +199,11 @@ def simulate(ip, sim_job):
         regr_sim_out_path = cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name
         common.create_dir(regr_sim_out_path)
         sim_out = regr_sim_out_path + "/" + sim_job.regression_timestamp
+        common.create_dir(sim_out)
     else:
         ip_dir_name = f"{ip.vendor}__{ip.name}"
         sim_out = cfg.sim_output_dir + "/" + sim_str + "/elab_out/single_sim/" + ip_dir_name
+        common.create_dir(sim_out)
     do_simulate(ip, sim_job, sim_out)
     sem.acquire()
     log_sim_end_history(ip, sim_job, start, common.timestamp())
@@ -659,16 +670,20 @@ def dut_elab_to_arg_list(ip, sim_job):
 
 def get_ip_flist_path(ip, sim_job):
     ip_str = f"{ip.vendor}/{ip.name}"
+    ip_dir = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     found_flist = False
     flist_path = ""
     
     if ip.hdl_src_flists[sim_job.simulator] != "":
         found_flist = True
-        if ip.is_encrypted:
-            flist_path = f"{ip.path}/{ip.src_path}.{sim_str}/{ip.hdl_src_flists[sim_job.simulator]}"
+        if ip.is_global and (sim_job.simulator == common.simulators_enum.METRICS):
+            flist_path = f".mio/temp/{ip_dir}/{ip.hdl_src_flists[sim_job.simulator]}"
         else:
-            flist_path = f"{ip.path}/{ip.src_path}/{ip.hdl_src_flists[sim_job.simulator]}"
+            if ip.is_encrypted:
+                flist_path = f"{ip.path}/{ip.src_path}.{sim_str}/{ip.hdl_src_flists[sim_job.simulator]}"
+            else:
+                flist_path = f"{ip.path}/{ip.src_path}/{ip.hdl_src_flists[sim_job.simulator]}"
     if not found_flist:
         flist_path = gen_flist(ip, sim_job)
     return flist_path
@@ -705,6 +720,7 @@ def gen_flists(ip, deps, sim_job):
 
 def gen_flist(ip, sim_job):
     ip_str = f"{ip.vendor}/{ip.name}"
+    ip_dir = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     flist_path = ""
     defines = convert_defines(sim_job)
@@ -720,28 +736,37 @@ def gen_flist(ip, sim_job):
     for dir in ip.hdl_src_directories:
         if dir == ".":
             if sim_job.simulator == common.simulators_enum.METRICS:
-                if ip.is_encrypted:
-                    directories.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}")
+                if ip.is_global:
+                    directories.append(f"{ip_dir}")
                 else:
-                    directories.append(f"{rel_ip_path}/{ip.src_path}")
+                    if ip.is_encrypted:
+                        directories.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}")
+                    else:
+                        directories.append(f"{rel_ip_path}/{ip.src_path}")
             else:
                 directories.append("${MIO_" + ip.name.upper() + "_SRC_PATH}")
         else:
             if sim_job.simulator == common.simulators_enum.METRICS:
-                if ip.is_encrypted:
-                    directories.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}/{dir}")
+                if ip.is_global:
+                    directories.append(f"{ip_dir}/{dir}")
                 else:
-                    directories.append(f"{rel_ip_path}/{ip.src_path}/{dir}")
+                    if ip.is_encrypted:
+                        directories.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}/{dir}")
+                    else:
+                        directories.append(f"{rel_ip_path}/{ip.src_path}/{dir}")
             else:
                 directories.append("${MIO_" + ip.name.upper() + "_SRC_PATH}/" + dir)
     
     top_files = []
     for file in ip.hdl_src_top_files:
         if sim_job.simulator == common.simulators_enum.METRICS:
-            if ip.is_encrypted:
-                top_files.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}/{file}")
+            if ip.is_global:
+                top_files.append(f"{ip_dir}/{file}")
             else:
-                top_files.append(f"{rel_ip_path}/{ip.src_path}/{file}")
+                if ip.is_encrypted:
+                    top_files.append(f"{rel_ip_path}/{ip.src_path}.{sim_str}/{file}")
+                else:
+                    top_files.append(f"{rel_ip_path}/{ip.src_path}/{file}")
         else:
             top_files.append("${MIO_" + ip.name.upper() + "_SRC_PATH}/" + file)
     
@@ -842,10 +867,13 @@ def get_incdir_list(deps, sim_job):
     incdir_list = []
     for dep in deps:
         for dir in dep.hdl_src_directories:
-            if dep.is_encrypted:
-                src_path = f"{dep.path}/{dep.src_path}.{sim_str}/{dir}"
+            if dep.is_global and sim_job.simulator == common.simulators_enum.METRICS:
+                src_path = f"{cfg.temp_path}/{dep.vendor}__{dep.name}/{dir}"
             else:
-                src_path = f"{dep.path}/{dep.src_path}/{dir}"
+                if dep.is_encrypted:
+                    src_path = f"{dep.path}/{dep.src_path}.{sim_str}/{dir}"
+                else:
+                    src_path = f"{dep.path}/{dep.src_path}/{dir}"
             if sim_job.simulator == common.simulators_enum.VIVADO:
                 incdir_list.append("-i " + src_path)
             else:
