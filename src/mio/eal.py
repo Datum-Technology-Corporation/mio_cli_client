@@ -24,7 +24,7 @@ from threading import BoundedSemaphore
 eda_processes = []
 
 vivado_default_compilation_args  = ["--incr", "-sv"]
-metrics_default_compilation_args = ["+acc+b"]
+metrics_default_compilation_args = ["+acc+b", "-suppress MultiBlockWrite:ReadingOutputModport:UndefinedMacro"]
 vcs_default_compilation_args     = ["-lca", "-sverilog"]
 xcelium_default_compilation_args = []
 questa_default_compilation_args  = ["-64", "-incrcomp"]
@@ -83,9 +83,9 @@ def compile_fsoc_core(flist_path, core, sim_job):
     timestamp_start = common.timestamp()
     var_name = "MIO_" + core.sname.replace("-", "_").upper() + "_SRC_PATH"
     os.environ[var_name] = core.dir
-    common.dbg(f"FuseSoC env var '{var_name}'='{core['path']}'")
-    vendor = "fsoc"
-    log_file_path = compile_flist(vendor, core['sname'], flist_path, [], sim_job, local=True)
+    common.dbg(f"FuseSoC env var '{var_name}'='{core.dir}'")
+    vendor = "@fsoc"
+    log_file_path = compile_flist(vendor, core.sname, flist_path, [], sim_job, local=True)
     timestamp_end = common.timestamp()
     errors = scan_cmp_log_file_for_errors(log_file_path, sim_job)
     if len(errors):
@@ -94,7 +94,7 @@ def compile_fsoc_core(flist_path, core, sim_job):
             common.error("  " + error)
         sim.kill_progress_bar()
         common.fatal("Stopping due to compilation.")
-    log_cmp_history_fsoc(core, sim_job, timestamp_start, timestamp_end)
+    log_cmp_history_fsoc(core, log_file_path, sim_job, timestamp_start, timestamp_end)
     return log_file_path
 
 
@@ -631,7 +631,7 @@ def dut_elab_to_arg_list(ip, sim_job):
     args = []
     if (ip.dut_ip_type == "fsoc"):
         file_path_partial_name = re.sub(r':', '_', ip.dut_fsoc_full_name)
-        eda_file_dir = cfg.fsoc_dir + "/" + ip.dut_name + "/sim-xsim"
+        eda_file_dir = cfg.fsoc_dir + "/" + ip.dut_fsoc_name + "/sim-xsim"
         eda_file_path = eda_file_dir + "/" + file_path_partial_name + "_0.eda.yml"
         try:
             if os.path.exists(eda_file_path):
@@ -639,13 +639,16 @@ def dut_elab_to_arg_list(ip, sim_job):
                     eda_yaml = yaml.load(edafile, Loader=SafeLoader)
                     if eda_yaml:
                         elab_options = eda_yaml['tool_options']['xsim']['xelab_options']
-                        args.append("-L " + fsoc_name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/@fsoc__" + ip.dut_name)
+                        if sim_job.simulator == common.simulators_enum.METRICS:
+                            args.append("-L " + "@fsoc__" + ip.dut_fsoc_name)
+                        else:
+                            args.append("-L " + ip.dut_fsoc_name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/@fsoc__" + ip.dut_fsoc_name)
                     else:
                         common.fatal("ERROR: Unable to parse FuseSoC output " + eda_file_path)
             else:
                 common.fatal("ERROR: Unable to parse FuseSoC output " + eda_file_path)
         except Exception as e:
-            common.fatal("ERROR: Unable to find FuseSoC core output for '" + dut_ip_name + "': " + str(e))
+            common.fatal("ERROR: Unable to find FuseSoC core output for '" + ip.dut_fsoc_name + "': " + str(e))
     else:
         dut_ip = ip.dut.target_ip_model
         dut_ip_dir_name = f"{ip.vendor}__{ip.name}"
@@ -925,6 +928,7 @@ def invoke_fsoc(ip, core, sim_job):
     fsc_args.flag = []
     fsc_cores_root = [core.dir]
     
+    
     try:
         fusesoc.main.init_logging(False, False)
         fsc_cfg = fusesoc.main.Config()
@@ -933,6 +937,11 @@ def invoke_fsoc(ip, core, sim_job):
         file_path_partial_name = re.sub(r':', '_', core.name)
         eda_file_dir = cfg.fsoc_dir + "/" + core.sname + "/sim-xsim"
         eda_file_path = eda_file_dir + "/" + file_path_partial_name + "_0.eda.yml"
+        core_rel_path = os.path.relpath(core.dir, eda_file_dir)
+        if sim_job.simulator == common.simulators_enum.METRICS:
+            core_base_path = os.path.relpath(core.dir, cfg.temp_path)
+        else:
+            core_base_path = "$MIO_" + core.sname.replace("-", "_").upper() + "_SRC_PATH"
         if not os.path.exists(eda_file_path):
             common.fatal("Could not find FuseSoC output file " + eda_file_path)
         else:
@@ -948,14 +957,16 @@ def invoke_fsoc(ip, core, sim_job):
                         if 'is_include_file' in file:
                             if 'include_path' in file:
                                 dir_path = file['include_path']
-                                dir_path = dir_path.replace(core_name, "%ROOT%", 1)
-                                dir_path = re.sub(".+%ROOT%", core.dir, dir_path)
+                                dir_path = dir_path.replace(core_rel_path, core_base_path)
                                 dirs.append(dir_path)
                         else:
                             file_path = file['name']
-                            file_path = file_path.replace(core_name, "%ROOT%", 1)
-                            file_path = re.sub(".+%ROOT%", core['path'], file_path)
+                            dir_path = pathlib.Path(f"{eda_file_dir}/{file_path}").parent.resolve()
+                            dir_path = os.path.relpath(dir_path, eda_file_dir)
+                            dir_path = dir_path.replace(core_rel_path, core_base_path)
+                            file_path = file_path.replace(core_rel_path, core_base_path)
                             files.append(file_path)
+                            dirs.append(dir_path)
                 
                 for param in eda_yaml['parameters']:
                     if eda_yaml['parameters'][param]['datatype'] == 'bool':
@@ -969,36 +980,32 @@ def invoke_fsoc(ip, core, sim_job):
                         defines.append(new_define)
                     else:
                         common.fatal("Support for non-bool FuseSoC parameters is not currently implemented")
-                sim_nickname = ""
-                if sim_job.simulator == common.simulators_enum.VIVADO:
-                    sim_nickname = "xsim"
-                    for option in eda_yaml['tool_options'][sim_nickname]['xelab_options']:
-                        if (re.match("--define", option)):
-                            new_define = {};
-                            matches = re.search("--define\s+(\w+)\s*(?:=\s*(\S+))?", option)
-                            if matches:
-                                new_define['name'] = matches.group(1)
-                                if len(matches.groups()) > 2:
-                                    new_define['value'] = matches.group(2)
-                                else:
-                                    new_define['boolean'] = True
-                                defines.append(new_define)
-                else:
-                    common.fatal("FuseSoC cores not yet supported for " + sim_str)
-                flist_template = cfg.templateEnv.get_template("viv.flist.j2")
+                sim_nickname = "xsim"
+                #if sim_job.simulator == common.simulators_enum.VIVADO:
+                #    sim_nickname = "xsim"
+                for option in eda_yaml['tool_options'][sim_nickname]['xelab_options']:
+                    if (re.match("--define", option)):
+                        new_define = {};
+                        matches = re.search("--define\s+(\w+)\s*(?:=\s*(\S+))?", option)
+                        if matches:
+                            new_define['name'] = matches.group(1)
+                            if len(matches.groups()) > 2:
+                                new_define['value'] = matches.group(2)
+                            else:
+                                new_define['boolean'] = True
+                            defines.append(new_define)
+                #else:
+                #    common.fatal("FuseSoC cores not yet supported for " + sim_str)
+                flist_template = cfg.templateEnv.get_template(f"{sim_str}.flist.j2")
                 outputText = flist_template.render(defines=defines, files=files, dirs=dirs)
-                flist_file_path = str(pathlib.Path(eda_file_dir + "/" + file_path_partial_name + "_0.flist").resolve())
+                flist_file_path = str(pathlib.Path(cfg.temp_path + "/" + file_path_partial_name + "_0.flist").resolve())
                 with open(flist_file_path,'w') as flist_file:
                     flist_file.write(outputText)
                 flist_file.close()
-                with open(flist_file_path,'r') as flist_file:
-                    content = flist_file.read()
-                    var = "${MIO_" + core.sname.replace("-", "_").upper() + "_SRC_PATH}"
-                    content = re.sub(f"(\.\.\/)+{ip_path}/{core.sname}", var, content, flags = re.M)
-                flist_file.close()
-                with open(flist_file_path,'w') as flist_file:
-                    flist_file.write(content)
-                flist_file.close()
+                
+                if sim_job.simulator == common.simulators_enum.METRICS:
+                    flist_file_path = os.path.relpath(flist_file_path, cfg.project_dir)
+                
                 return flist_file_path
     except Exception as e:
         common.fatal("Failed to convert FuseSoC output data for core '" + core.name + "': "+ str(e))

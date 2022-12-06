@@ -142,7 +142,12 @@ def main(sim_job):
     if sim_job.compile:
         cmp_ip_count = cmp_ip_count + cmp_dependencies(ip, sim_job)
         if ip.has_dut:
-            if not ip.dut.target_ip_model.is_compiled[sim_job.simulator]:
+            compile_dut = False
+            if ip.dut_ip_type == "fsoc":
+                compile_dut = ip.dut_core.is_compiled[sim_job.simulator]
+            else:
+                compile_dut = ip.target_ip_model.is_compiled[sim_job.simulator]
+            if not compile_dut:
                 cmp_ip_count = cmp_ip_count + 1
                 if ip.dut_ip_type == "fsoc":
                     dut_str = f"{ip.dut_fsoc_name}"
@@ -487,17 +492,12 @@ def cmp_dut(ip, sim_job):
     defines = sim_job.cmp_args
     
     if ip.dut_ip_type == "fsoc":
-        dut_core = cache.get_core(ip.dut_fsoc_full_name)
-        if dut_core != None:
-            common.dbg("Found FuseSoC DUT '" + ip.dut_fsoc_full_name + "'")
-            if not core['installed'] or sim_jobfsoc:
-                flist_path = eal.invoke_fsoc(ip, dut_core, sim_job)
-                dut_core['installed'] = True
-                eal.compile_fsoc_core(flist_path, core, sim_job)
-            else:
-                common.info("Skipping installation of DUT FuseSoC core '" + ip.dut_fsoc_full_name + "'.")
+        if not ip.dut_core.is_installed or sim_job.fsoc:
+            flist_path = eal.invoke_fsoc(ip, ip.dut_core, sim_job)
+            ip.dut_core.is_installed = True
         else:
-            common.fatal("Could not find DUT FuseSoC Core '" + ip.dut_fsoc_full_name + "'.")
+            common.info("Skipping processing of DUT FuseSoC core '" + ip.dut_fsoc_full_name + "'.")
+        eal.compile_fsoc_core(flist_path, ip.dut_core, sim_job)
     else:
         if ip.dut != None:
             if ip.dut.target_ip_model == None:

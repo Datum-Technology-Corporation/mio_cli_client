@@ -73,7 +73,7 @@ def exit(dump_cache=True):
     if dump_cache:
         cache.write_caches_to_disk()
         user.write_user_data_to_disk()
-    remove_dir(cfg.temp_path)
+    #remove_dir(cfg.temp_path)
     print()
     sys.exit(0)
 

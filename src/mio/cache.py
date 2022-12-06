@@ -21,6 +21,7 @@ import collections
 import pathlib
 import semver
 import time
+import fusesoc
 
 
 
@@ -35,7 +36,7 @@ core_cache = {}
 class FCore:
     """FuseSoC Core Mode"""
     
-    def __init(self, dir="", path=""):
+    def __init__(self, dir="", path=""):
         self.dir  = dir
         self.path = path
         if path != "":
@@ -45,7 +46,8 @@ class FCore:
         self.name = ""
         self.sname = ""
         self.core_yml = {}
-        self.installed = False
+        self.is_installed = False
+        self.is_compiled = {}
         self.is_compiled[common.simulators_enum.VIVADO ] = False
         self.is_compiled[common.simulators_enum.METRICS] = False
         self.is_compiled[common.simulators_enum.VCS    ] = False
@@ -70,7 +72,7 @@ class FCore:
         self.name  = yml['name']
         self.sname = yml['sname']
         self.core_yml = yml['core_yml']
-        self.installed = yml['installed']
+        self.is_installed = yml['is_installed']
         self.is_compiled[common.simulators_enum.VIVADO ] = yml['is_compiled']['viv']
         self.is_compiled[common.simulators_enum.METRICS] = yml['is_compiled']['mtr']
         self.is_compiled[common.simulators_enum.VCS    ] = yml['is_compiled']['vcs']
@@ -86,7 +88,8 @@ class FCore:
         dict['name']  = self.name
         dict['sname'] = self.sname
         dict['core_yml'] = self.core_yml
-        dict['installed'] = self.installed
+        dict['is_installed'] = self.is_installed
+        dict['is_compiled'] = {}
         dict['is_compiled']['viv'] = self.is_compiled[common.simulators_enum.VIVADO ]
         dict['is_compiled']['mtr'] = self.is_compiled[common.simulators_enum.METRICS]
         dict['is_compiled']['vcs'] = self.is_compiled[common.simulators_enum.VCS    ]
@@ -178,6 +181,7 @@ class IP:
         self.hdl_src_flists[common.simulators_enum.RIVIERA] = ""
         self.has_dut                    = False
         self.dut                        = None
+        self.dut_core                   = None
         self.dut_ip_type                = ""
         self.dut_fsoc_name              = ""
         self.dut_fsoc_full_name         = ""
@@ -498,11 +502,9 @@ class IP:
         dict["vproj_libs"]                 = self.vproj_libs
         dict["vproj_vlog"]                 = self.vproj_vlog
         dict["vproj_vhdl"]                 = self.vproj_vhdl
-        
-        if self.has_dut and self.dut_ip_type == "":
-            dict['dut_vendor']  = self.dut.vendor
-            dict['dut_name']    = self.dut.target_ip
-            dict['dut_version'] = self.dut.semver
+        dict['dut_vendor']  = self.dut.vendor
+        dict['dut_name']    = self.dut.target_ip
+        dict['dut_version'] = self.dut.semver
         
         dict['dependencies'] = {}
         for dep in self.dependencies:
@@ -544,9 +546,12 @@ class IP:
     
     def resolve_dependencies(self):
         common.dbg(f"Resolving dependencies for IP '{self.vendor}/{self.name}'")
-        if self.dut != None:
-            self.dut.resolve()
-            self.dut_vendor = self.dut.target_ip_model.vendor
+        if self.has_dut:
+            if self.dut_ip_type == "fsoc":
+                self.dut_core = get_core(self.dut_fsoc_full_name, True)
+            else:
+                self.dut.resolve()
+                self.dut_vendor = self.dut.target_ip_model.vendor
         for dep in self.dependencies:
             dep.resolve()
     
@@ -697,10 +702,12 @@ def get_anon_ip(ip_name, fail_if_not_found=False):
     return ip
 
 
-def get_core(core_name):
+def get_core(core_name, fail_if_not_found=False):
     if core_name in core_cache:
         return core_cache[core_name]
     else:
+        if fail_if_not_found:
+            common.fatal(f"Could not find core '{core_name}'")
         return None
 
 
@@ -743,7 +750,7 @@ def check_ip_cache_integrity():
         for ip in ip_cache[vendor]:
             if not ip_cache[vendor][ip].integrity_check():
                 list[vendor] = ip
-                common.warning(f"Removed IP '{vendor}/{ip}'from cache")
+                common.warning(f"Removed IP '{vendor}/{ip}' from cache")
     for vendor in list:
         ip_cache[vendor].pop(list[vendor])
 
@@ -790,7 +797,7 @@ def find_fsoc_cores(path):
             current_core_file_path = os.path.join(current_dir_path, dir + ".core")
             if os.path.exists(current_core_file_path):
                 common.dbg("Found FuseSoC core file at '" + current_core_file_path + "'")
-                core = Core(current_core_file_path)
+                core = FCore(current_dir_path, current_core_file_path)
                 core.parse_from_core_yml()
                 if core.name not in core_cache:
                     core_cache[core.name] = core
@@ -882,7 +889,7 @@ def write_caches_to_disk():
             core_yml = {}
             core_yml['cores'] = {}
             for core in core_cache:
-                core_yml['cores']['core'] = core_cache[core].convert_to_cache_dict()
+                core_yml['cores'][core] = core_cache[core].convert_to_cache_dict()
             yaml.dump(core_yml, yaml_file_write)
         
         with open(cfg.job_history_file_path, 'w') as yamlfile:
