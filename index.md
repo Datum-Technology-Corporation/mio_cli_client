@@ -1,7 +1,8 @@
 # Home Page
 
+## [Latest Release](https://pypi.org/project/mio-cli/)
 ## [User Manual](https://mio-cli.readthedocs.io/en/latest/)
-## [Latest Release](https://pypi.org/project/mio-client/#files)
+## [Developer Guide](dev_guide.md)
 
 ----------------
 
@@ -15,7 +16,6 @@ The Moore.io Command Line Interface (CLI) Client orchestrates disparate free and
 | **[Sub-Projects](https://github.com/Datum-Technology-Corporation/mio_cli/projects)** | **[Wiki](https://github.com/Datum-Technology-Corporation/mio_cli/wiki)** |
 
 
-## [Developer Guide](dev_guide.md)
 
 
 ## Metrics
