@@ -1,6 +1,6 @@
 # Home Page
 
-## [User Manual](https://mooreio-client.readthedocs.io/en/latest/)
+## [User Manual](https://mio-cli.readthedocs.io/en/latest/)
 ## [Latest Release](https://pypi.org/project/mio-client/#files)
 
 ----------------
