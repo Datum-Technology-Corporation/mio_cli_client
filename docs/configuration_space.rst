@@ -18,7 +18,7 @@ Input
 - ``$MIO_QUESTA_HOME`` - Path to Siemens Questa simulator installation directory.
 - ``$MIO_RIVIERA_HOME`` - Path to Aldec Riviera PRO simulator installation directory.
 - ``$MIO_VCS_HOME`` - Path to Synopsys VCS simulator installation directory.
-- ``$MIO_VIVADO_HOME`` - Path to Xilinx Vivado installation directory (``bin`` should be found under this directory).
+- ``$MIO_VIVADO_HOME`` - Path to Xilinx Vivado installation directory.
 - ``$MIO_XCELIUM_HOME`` - Path to Cadence XCelium simulator installion directory.
 
 Output
