@@ -1,4 +1,0 @@
-UVM Template System
-===================
-
-TBD
