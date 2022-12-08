@@ -65,11 +65,9 @@ The following is an IP descriptor for an IP called 'Datapath Sub-System Test Ben
     sub-type : uvm_tb
   
   dependencies:
-    "@accellera/uvm"  :  "1.2"
-    "@datum/uvml"     : "~1.0"
-    "@datum/uvml_logs": "~1.0"
-    "@datum/uvma_axil": "~1.0"
-    "@acme/uvme_dp_ss": "~1.0"
+    "datum/uvmx"     : "~1.0"
+    "datum/uvma_axil": "~1.0"
+    "acme/uvme_dp_ss": "~1.0"
   
   structure:
     scripts-path : "bin"
@@ -86,7 +84,7 @@ The following is an IP descriptor for an IP called 'Datapath Sub-System Test Ben
     tests-name-template: "uvmt_dp_ss_{{ name }}_test_c"
 
   dut:
-    name: "@big-chip/dp_ss"
+    name: "acme/dp_ss"
 
 Design
 ------
@@ -95,7 +93,7 @@ The following is an IP descriptor for a Vivado Project called 'Datapath Sub-Syst
 
   ip:
      name     : dp_ss
-     vendor   : big-chip
+     vendor   : acme
      version  : 2.1.4
      full-name: Datapath Sub-System
      type     : rtl
@@ -134,7 +132,7 @@ The standard structure is defined below:
 
 - ``dependencies`` - `List` - IP dependencies.  Can include both local (project) and external (from Moore.io IP catalog).
 
-  - ``"@<Vendor>/<IP Name>" : "<Version>"`` - Where ``<IP Name>`` is the (short) name of an IP and ``<Version>`` is the required version of that IP specified via semver.
+  - ``"<Vendor>/<IP Name>" : "<Version>"`` - Where ``<IP Name>`` is the (short) name of an IP and ``<Version>`` is the required version of that IP specified via semver.
 
 - ``structure`` - Paths for directory structure.
 
