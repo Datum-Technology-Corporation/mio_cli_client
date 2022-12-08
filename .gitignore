@@ -1,4 +1,6 @@
 .mio
+.mdc/sync
+.mdc/workspace
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

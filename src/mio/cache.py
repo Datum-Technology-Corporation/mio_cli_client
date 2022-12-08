@@ -413,7 +413,7 @@ class IP:
                 if yml["dut_vendor"] != "":
                     dut_name = yml["dut_name"]
                     dut_vendor = yml["dut_vendor"]
-                    self.dut = Dependency(self, f"@{dut_vendor}/{dut_name}", yml["dut_version"])
+                    self.dut = Dependency(self, f"{dut_vendor}/{dut_name}", yml["dut_version"])
                 else:
                     self.dut = Dependency(self, yml["dut_name"], yml["dut_version"])
             
@@ -502,13 +502,19 @@ class IP:
         dict["vproj_libs"]                 = self.vproj_libs
         dict["vproj_vlog"]                 = self.vproj_vlog
         dict["vproj_vhdl"]                 = self.vproj_vhdl
-        dict['dut_vendor']  = self.dut.vendor
-        dict['dut_name']    = self.dut.target_ip
-        dict['dut_version'] = self.dut.semver
+        
+        if self.has_dut:
+            dict['dut_vendor']  = self.dut.vendor
+            dict['dut_name']    = self.dut.target_ip
+            dict['dut_version'] = self.dut.semver
+        else:
+            dict['dut_vendor']  = ""
+            dict['dut_name']    = ""
+            dict['dut_version'] = ""
         
         dict['dependencies'] = {}
         for dep in self.dependencies:
-            dict['dependencies'][f"@{dep.vendor}/{dep.target_ip}"] = dep.semver
+            dict['dependencies'][f"{dep.vendor}/{dep.target_ip}"] = dep.semver
         return dict
     
     def integrity_check(self):
@@ -625,17 +631,11 @@ class Dependency:
         self.owner_ip  = owner_ip
         self.target_ip_model = None
         common.dbg(f"Dependency after parsing: vendor='{self.vendor}' , target_ip='{self.target_ip}'")
-
+    
     def parse_dep_string(self, string):
-        regex = "\@((?:\w|\d|\_|\-)+)\/((?:\w|\d|\_)+)"
         clean_str = string.lower().strip()
-        if clean_str[0] == "@":
-            result = re.match(regex, clean_str)
-            if (result):
-                self.vendor    = result.group(1)
-                self.target_ip = result.group(2)
-            else:
-                common.fatal(f"Invalid dependency while parsing '{clean_str}'")
+        if "/" in clean_str:
+            self.vendor, self.target_ip = clean_str.split("/")
         else:
             self.target_ip = clean_str
             self.vendor = ""

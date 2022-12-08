@@ -270,7 +270,12 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
     elif sim_job.simulator == common.simulators_enum.METRICS:
         arg_list += metrics_default_compilation_args
         arg_list += incdir_list
-        arg_list.append(f"-lib {vendor}__{name}")
+        if vendor == "@global":
+            arg_list.append(f"-lib global__{name}")
+        elif vendor == "@fsoc":
+            arg_list.append(f"-lib fsoc__{name}")
+        else:
+            arg_list.append(f"-lib {vendor}__{name}")
         #common.copy_file(license_macros_file_path, f"{cfg.temp_path}/uvml_mio_lic_macros.svh")
         #arg_list.append(f".mio/temp/uvml_mio_lic_macros.svh") # HACK compute that path
         arg_list.append("-F " + flist_path)
@@ -396,13 +401,22 @@ def do_elaborate(ip, sim_job, wd):
     elif sim_job.simulator == common.simulators_enum.METRICS:
         arg_list += metrics_default_elaboration_args
         mtr_elaboration_log_path = ip_dir_name + "." + sim_str + ".elab.log"
-        arg_list.append(f"-genimage {ip.vendor}__{ip.name}")
         arg_list.append(f"-l {mtr_elaboration_log_path}")
         arg_list.append(f"-timescale {cfg.sim_timescale}")
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
-        arg_list.append(f"-L {ip.vendor}__{ip.name}")
+        
+        if ip.vendor == "@global":
+            arg_list.append(f"-genimage global__{ip.name}")
+            arg_list.append(f"-L global__{ip.name}")
+        elif ip.vendor == "@fsoc":
+            arg_list.append(f"-genimage fsoc__{ip.name}")
+            arg_list.append(f"-L fsoc__{ip.name}")
+        else:
+            arg_list.append(f"-genimage {ip.vendor}__{ip.name}")
+            arg_list.append(f"-L {ip.vendor}__{ip.name}")
+        
         for construct in ip.hdl_src_top_constructs:
             if "." in construct:
                 lib,name = construct.split(".")
@@ -640,7 +654,7 @@ def dut_elab_to_arg_list(ip, sim_job):
                     if eda_yaml:
                         elab_options = eda_yaml['tool_options']['xsim']['xelab_options']
                         if sim_job.simulator == common.simulators_enum.METRICS:
-                            args.append("-L " + "@fsoc__" + ip.dut_fsoc_name)
+                            args.append("-L " + "fsoc__" + ip.dut_fsoc_name)
                         else:
                             args.append("-L " + ip.dut_fsoc_name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/@fsoc__" + ip.dut_fsoc_name)
                     else:
@@ -841,7 +855,12 @@ def convert_deps_to_args(deps, sim_job):
     args = []
     for dep in deps:
         if dep.name != "uvm":
-            dep_dir_name = f"{dep.vendor}__{dep.name}"
+            if dep.vendor == "@global":
+                dep_dir_name = f"global__{dep.name}"
+            elif dep.vendor == "@fsoc":
+                dep_dir_name = f"fsoc__{dep.name}"
+            else:
+                dep_dir_name = f"{dep.vendor}__{dep.name}"
             if sim_job.simulator == common.simulators_enum.METRICS:
                 lib_str = f"-L {dep_dir_name}"
             elif sim_job.simulator == common.simulators_enum.QUESTA:

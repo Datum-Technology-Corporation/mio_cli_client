@@ -267,15 +267,9 @@ def create_common_files():
 def parse_dep(string):
     vendor = ""
     ip = ""
-    regex = "((?:\@?\w|\d|\_|\-)+)\/((?:\w|\d|\_)+)"
     clean_str = string.lower().strip()
     if "/" in clean_str:
-        result = re.match(regex, clean_str)
-        if (result):
-            vendor = result.group(1)
-            ip     = result.group(2)
-        else:
-            fatal(f"Invalid dependency: {clean_str}")
+        vendor, ip = clean_str.split("/")
     else:
         ip = clean_str
         vendor = ""

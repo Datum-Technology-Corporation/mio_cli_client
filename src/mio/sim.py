@@ -146,7 +146,7 @@ def main(sim_job):
             if ip.dut_ip_type == "fsoc":
                 compile_dut = ip.dut_core.is_compiled[sim_job.simulator]
             else:
-                compile_dut = ip.target_ip_model.is_compiled[sim_job.simulator]
+                compile_dut = ip.is_compiled[sim_job.simulator]
             if not compile_dut:
                 cmp_ip_count = cmp_ip_count + 1
                 if ip.dut_ip_type == "fsoc":
@@ -460,7 +460,7 @@ def cmp_dependencies(ip, sim_job):
             msg = f"Compiling 1 dependency"
         else:
             msg = f"Compiling {num_deps} dependencies"
-        common.banner(msg)
+        common.info(msg)
     else:
         return 0
     
