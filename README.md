@@ -13,19 +13,11 @@
 
 
 ## Installation
-`mio` can be installed directly from [`pip3`](https://pip.pypa.io/en/stable/), but it is recommended to use [`pipx`](https://pypa.github.io/pipx/):
+`mio` can be installed directly from [`pip3`](https://pip.pypa.io/en/stable/):
 
 ````
-pipx install mio-cli
+pip3 install mio-cli
 ````
-
-`pipx` can be installed via:
-
-````
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-````
-
 
 
 ## [Developer Guide](https://datum-technology-corporation.github.io/mio_cli_client/dev_guide.html)
