@@ -14,17 +14,16 @@ Environment Variables
 
 Input
 *****
-- ``$VERIBLE_HOME`` - Path to Verible installation directory.
-- ``$METRICS_HOME`` - Path to Metrics simulator installation directory.
-- ``$QUESTA_HOME`` - Path to Siemens Questa simulator installation directory.
-- ``$RIVIERA_HOME`` - Path to Aldec Riviera PRO simulator installation directory.
-- ``$VCS_HOME`` - Path to Synopsys VCS simulator installation directory.
-- ``$VIVADO_HOME`` - Path to Xilinx Vivado installation directory (``bin`` should be found under this directory).
-- ``$XCELIUM_HOME`` - Path to Cadence XCelium simulator installion directory.
+- ``$MIO_METRICS_HOME`` - Path to Metrics simulator installation directory.
+- ``$MIO_QUESTA_HOME`` - Path to Siemens Questa simulator installation directory.
+- ``$MIO_RIVIERA_HOME`` - Path to Aldec Riviera PRO simulator installation directory.
+- ``$MIO_VCS_HOME`` - Path to Synopsys VCS simulator installation directory.
+- ``$MIO_VIVADO_HOME`` - Path to Xilinx Vivado installation directory (``bin`` should be found under this directory).
+- ``$MIO_XCELIUM_HOME`` - Path to Cadence XCelium simulator installion directory.
 
 Output
 ******
-- ``${{ name.upper() }}_SRC_PATH`` - Path to IP ``name`` 's source directory on disk.  Custom filelists must use this as their base directory.
+- ``MIO_${<IP name>}_SRC_PATH`` - Path to IP ``name`` 's source directory on disk.  Custom filelists must use this as their base directory.
 
 
 ip
