@@ -26,7 +26,16 @@ from yaml.loader import SafeLoader
 import math
 import re
 import atexit
+import tarfile
 
+
+
+bwrap_ignore_list = [
+    "xsim.dir", ".str", ".Xil", ".jou", ".log", ".wdb", ".vcd", ".log", ".sdb", ".rlx", ".pb", ".o", ".png", ".jpg",
+    ".svg", ".vsdx", ".docx", ".xlsx", ".pptx"
+]
+
+bwrap_ignore_dirs = [ ".git", ".svn" ]
 
 regex_define_pattern  = "\+define\+((?:\w|_|\d)+)(?:\=((?:\w|_|\d)+))?"
 regex_plusarg_pattern = "\+((?:\w|_|\d)+)(?:\=((?:\w|_|\d)+))?"
@@ -159,7 +168,7 @@ def main(sim_job):
                     dut_str = f"{ip.dut_fsoc_name}"
                 else:
                     dut_str = f"{ip.dut.vendor}/{ip.dut.target_ip}"
-                if dut_str in cfg.job_history:
+                if (not sim_job.dry_run) and (dut_str in cfg.job_history):
                     est_time = 0
                     curr_est_time = 0
                     if 'compilation' in cfg.job_history[dut_str]:
@@ -320,8 +329,30 @@ def bubble_wrap(sim_job):
             readme_file.write(f"1. Set ${bin_text}.  Ex: export {bin_text}=/tools/{bin_string}\n")
             readme_file.write(f"2. Run: bash ./run.sh\n")
         common.info(f"Wrote {readme_path}")
+        
+        tarball_filename = f"{sim_job.ip}.{sim_job.test}.{sim_job.seed}.{sim_str}.tgz"
+        tarball_path = f"{cfg.project_dir}/../{tarball_filename}"
+        common.info(f"Writing {tarball_path} ...")
+        with tarfile.open(tarball_path, "w:gz") as tar:
+            files = os.listdir(cfg.project_dir)
+            for file in files:
+                file_path = f"{cfg.project_dir}/{file}"
+                if os.path.isdir(file_path):
+                    if file in bwrap_ignore_dirs:
+                        continue
+                common.info(f"Compressing {file}")
+                tar.add(file_path, exclude=bwrap_exclude, arcname=file)
+        common.info("Done")
+        
     except Exception as e:
         common.fatal(f"Failed to create bubble-wrap tarball: {e}")
+
+
+
+def bwrap_exclude(filename):
+    for regex in bwrap_ignore_list:
+        if regex in filename:
+            return True
 
 
 

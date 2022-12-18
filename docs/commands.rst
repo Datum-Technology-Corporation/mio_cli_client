@@ -128,7 +128,7 @@ Usage
 Options
 ^^^^^^^
 ================  =========================  ===========================
-``-b``            ``--bwrap``                Does not run command, only creates shell script to re-create the command without mio and creates a tarball of the project in the project root directory.  Currently only supports `sim` command.
+``-b``            ``--bwrap``                Does not run command, only creates shell script to re-create the command without mio and creates a tarball of the project outside the project root directory.  Currently only supports `sim` command.
 ================  =========================  ===========================
 
 Examples
