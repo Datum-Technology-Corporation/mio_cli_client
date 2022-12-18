@@ -119,7 +119,7 @@ repeat
 
 Description
 ^^^^^^^^^^^
-Repeats last command ran by mio.  Currently only supports Bubble-Wrap (--bwrap) usage for sending bug report tarballs to EDA vendors.  Currently only supported for `sim` command.
+Repeats last command ran by mio.  Currently only supports the `sim` command.
 
 Usage
 ^^^^^

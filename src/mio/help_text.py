@@ -3,7 +3,7 @@
 ########################################################################################################################
 
 
-version = "1.0.0"
+version = "1.0.1"
 version_text = f"Moore.io CLI Client v{version}"
 
 
@@ -60,15 +60,14 @@ Full Command List (`mio help CMD` for help on a specific command):
 
 
 repeat_help_text = """Moore.io Repeat (!) Command
-   Repeats last command ran by mio.  Currently only supports Bubble-Wrap (--bwrap) usage for sending bug report tarballs
-   to EDA vendors.  Currently only supported for `sim` command.
+   Repeats last command ran by mio.  Currently only supports the `sim` command.
    
 Usage:
    mio ! CMD [OPTIONS]
    
 Options:
    -b, --bwrap  Does not run command, only creates shell script to re-create the command without mio and creates a
-                tarball of the project in the project root directory.  Currently only supports `sim` command.
+                tarball of the project outside the project root directory.  Currently only supports `sim` command.
    
 Examples:
    mio sim uvmt_example -t rand_stim -s 1 ; mio ! sim -b  # Run a simulation for `uvmt_example` and create a tarball

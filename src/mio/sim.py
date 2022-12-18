@@ -32,7 +32,7 @@ import tarfile
 
 bwrap_ignore_list = [
     "xsim.dir", ".str", ".Xil", ".jou", ".log", ".wdb", ".vcd", ".log", ".sdb", ".rlx", ".pb", ".o", ".png", ".jpg",
-    ".svg", ".vsdx", ".docx", ".xlsx", ".pptx"
+    ".svg", ".vsdx", ".docx", ".xlsx", ".pptx", ".md"
 ]
 
 bwrap_ignore_dirs = [ ".git", ".svn" ]
@@ -287,7 +287,7 @@ def main(sim_job):
 def bubble_wrap(sim_job):
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     run_script_path = f"{cfg.sim_dir}/run.sh"
-    readme_path = f"{cfg.sim_dir}/README"
+    readme_path = f"{cfg.sim_dir}/README.txt"
     
     if sim_job.simulator == common.simulators_enum.VIVADO:
         bin_text = "MIO_VIVADO_HOME"
