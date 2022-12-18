@@ -47,7 +47,8 @@ Options:
 
 Full Command List (`mio help CMD` for help on a specific command):
    Help and Shell/Editor Integration
-      help           Documentation for all mio commands
+      doctor         Runs a set of checks to ensure mio installation has what it needs to operate properly
+      help           Prints documentation for mio commands
    
    Project and Code Management
       init           Starts project creation dialog
@@ -57,15 +58,15 @@ Full Command List (`mio help CMD` for help on a specific command):
       install        Install all IP dependencies from IP Marketplace
       login          Start session with IP Marketplace
       package        Create a compressed archive of an IP
-      publish        Publish IP to IP Marketplace
    
    EDA Automation
+      !              Repeat last command
+      regr           Runs regression against an IP
       sim            Performs necessary steps to simulate an IP with any simulator
-      regr           Run regression against an IP
       
    Manage Results and other EDA Tool Outputs
       clean          Manages outputs from tools (other than job results)
-      dox            HDL source code documentation generation via Doxygen
       cov            Manages coverage data from EDA tools
+      dox            HDL source code documentation generation via Doxygen
       results        Manages results from EDA tools
 ````
