@@ -8,7 +8,7 @@
 
 |  | From the [User Manual](https://mio-cli.readthedocs.io/en/latest/)'s [Executive Summary](https://mio-cli.readthedocs.io/en/latest/overview.html#executive-summary) |
 |-|-|
-| [![Moore.io Logo](https://github.com/Datum-Technology-Corporation/mio_cli_client/blob/gh-pages/assets/img/logo.png?raw=true)](https://mio-cli.readthedocs.io/en/latest/index.html) | The Moore.io Command Line Interface (CLI) Client orchestrates disparate free and/or open source tools into a single, complete, straightforward and integrated toolchain for hardware engineers.  The CLI consists of a succinct and powerful command set which developers use via a terminal on their operating system (Windows/Linux/OSX). |
+| [![Moore.io Logo](https://github.com/Datum-Technology-Corporation/mio_cli_client/blob/gh-pages/assets/img/logo.png?raw=true)](https://pypi.org/project/mio-cli/1.0.1/) | The Moore.io Command Line Interface (CLI) Client orchestrates disparate free and/or open source tools into a single, complete, straightforward and integrated toolchain for hardware engineers.  The CLI consists of a succinct and powerful command set which developers use via a terminal on their operating system (Windows/Linux/OSX). |
 
 
 
