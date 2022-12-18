@@ -10,15 +10,8 @@ version_text = f"Moore.io CLI Client v{version}"
 
 
 main_help_text = f"""
-                              ███╗   ███╗ ██████╗  ██████╗ ██████╗ ███████╗   ██╗ ██████╗
-                              ████╗ ████║██╔═══██╗██╔═══██╗██╔══██╗██╔════╝   ██║██╔═══██╗
-                              ██╔████╔██║██║   ██║██║   ██║██████╔╝█████╗     ██║██║   ██║
-                              ██║╚██╔╝██║██║   ██║██║   ██║██╔══██╗██╔══╝     ██║██║   ██║
-                              ██║ ╚═╝ ██║╚██████╔╝╚██████╔╝██║  ██║███████╗██╗██║╚██████╔╝
-                              ╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝╚═╝ ╚═════╝
                                  Moore.io (`mio`) Command Line Interface (CLI) - v{version}
-                             User Manual: https://readthedocs.org/projects/mooreio-client/
-
+                                      User Manual: https://mio-cli.readthedocs.io/
               https://mooreio.com - Copyright 2021-2022 Datum Technology Corporation - https://datumtc.ca
 Usage:
   mio [--version] [--help]
@@ -52,6 +45,7 @@ Full Command List (`mio help CMD` for help on a specific command):
       package        Create a compressed archive of an IP
    
    EDA Automation
+      !              Repeat last command
       regr           Runs regression against an IP
       sim            Performs necessary steps to simulate an IP with any simulator
       
@@ -61,6 +55,24 @@ Full Command List (`mio help CMD` for help on a specific command):
       dox            HDL source code documentation generation via Doxygen
       results        Manages results from EDA tools
 """
+
+
+
+
+repeat_help_text = """Moore.io Repeat (!) Command
+   Repeats last command ran by mio.  Currently only supports Bubble-Wrap (--bwrap) usage for sending bug report tarballs
+   to EDA vendors.  Currently only supported for `sim` command.
+   
+Usage:
+   mio ! CMD [OPTIONS]
+   
+Options:
+   -b, --bwrap  Does not run command, only creates shell script to re-create the command without mio and creates a
+                tarball of the project in the project root directory.  Currently only supports `sim` command.
+   
+Examples:
+   mio sim uvmt_example -t rand_stim -s 1 ; mio ! sim -b  # Run a simulation for `uvmt_example` and create a tarball
+                                                          # that can be run by anyone using only bash."""
 
 
 

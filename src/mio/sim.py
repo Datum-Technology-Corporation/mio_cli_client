@@ -68,10 +68,15 @@ class SimulationJob:
         self.verbosity       = ""
         self.waves           = False
         self.cov             = False
+        self.dry_run         = False
         self.raw_args        = []
         self.cmp_args        = {}
         self.elab_args       = {}
         self.sim_args        = {}
+        
+        self.bwrap           = False
+        self.bwrap_commands  = []
+        self.bwrap_flists    = {}
         
         self.is_regression        = False
         self.regression_name      = ""
@@ -142,6 +147,7 @@ def main(sim_job):
     if sim_job.compile:
         cmp_ip_count = cmp_ip_count + cmp_dependencies(ip, sim_job)
         if ip.has_dut:
+        #if False:
             compile_dut = False
             if ip.dut_ip_type == "fsoc":
                 compile_dut = ip.dut_core.is_compiled[sim_job.simulator]
@@ -182,7 +188,7 @@ def main(sim_job):
             if not sim_job.is_regression:
                 common.banner("Compiling IP '" + ip_str + "'")
             cmp_ip_count = cmp_ip_count + 1
-            if ip_str in cfg.job_history:
+            if (not sim_job.dry_run) and (ip_str in cfg.job_history):
                 if 'compilation' in cfg.job_history[ip_str]:
                     est_time = 0
                     curr_est_time = 0
@@ -220,7 +226,7 @@ def main(sim_job):
         est_time = 0
         curr_est_time = 0
         if ip_str in cfg.job_history:
-            if 'elaboration' in cfg.job_history[ip_str]:
+            if (not sim_job.dry_run) and ('elaboration' in cfg.job_history[ip_str]):
                 for job in cfg.job_history[ip_str]['elaboration']:
                     start = datetime.strptime(job['timestamp_start'], "%Y/%m/%d-%H:%M:%S")
                     end   = datetime.strptime(job['timestamp_end'  ], "%Y/%m/%d-%H:%M:%S")
@@ -263,6 +269,60 @@ def main(sim_job):
             if sim_job.compile == True:
                 print_end_of_compilation_message(ip, sim_job)
             print_end_of_elaboration_message(ip, sim_job)
+    
+    if sim_job.bwrap:
+        bubble_wrap(sim_job)
+
+
+
+def bubble_wrap(sim_job):
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
+    run_script_path = f"{cfg.sim_dir}/run.sh"
+    readme_path = f"{cfg.sim_dir}/README"
+    
+    if sim_job.simulator == common.simulators_enum.VIVADO:
+        bin_text = "MIO_VIVADO_HOME"
+        bin_string = "vivado/bin"
+    if sim_job.simulator == common.simulators_enum.METRICS:
+        bin_text = "MIO_METRICS_HOME"
+        bin_string = "metrics/bin"
+    if sim_job.simulator == common.simulators_enum.VCS:
+        bin_text = "MIO_VCS_HOME"
+        bin_string = "vcs/bin"
+    if sim_job.simulator == common.simulators_enum.QUESTA:
+        bin_text = "MIO_QUESTA_HOME"
+        bin_string = "questa/bin"
+    if sim_job.simulator == common.simulators_enum.XCELIUM:
+        bin_text = "MIO_XCELIUM_HOME"
+        bin_string = "xcelium/bin"
+    if sim_job.simulator == common.simulators_enum.RIVIERA:
+        bin_text = "MIO_RIVIERA_HOME"
+        bin_string = "riviera/bin"
+    
+    try:
+        with open(run_script_path, 'w') as run_script_file:
+            run_script_file.write(f"export PROJECT_ROOT_DIR=$(pwd)/..\n\n")
+            for flist in sim_job.bwrap_flists:
+                run_script_file.write(f"export {flist}={sim_job.bwrap_flists[flist]}\n")
+            run_script_file.write("\n\n\n\n")
+            for cmd in sim_job.bwrap_commands:
+                cmd = cmd.replace(cfg.project_dir , "${PROJECT_ROOT_DIR}")
+                cmd = cmd.replace("-f .mio/"      , "-f ${PROJECT_ROOT_DIR}/.mio/")
+                cmd = cmd.replace(cfg.vivado_home , "${MIO_VIVADO_HOME}" )
+                cmd = cmd.replace(cfg.metrics_home, "${MIO_METRICS_HOME}")
+                cmd = cmd.replace(cfg.vcs_home    , "${MIO_VCS_HOME}"    )
+                cmd = cmd.replace(cfg.xcelium_home, "${MIO_XCELIUM_HOME}")
+                cmd = cmd.replace(cfg.questa_home , "${MIO_QUESTA_HOME}" )
+                cmd = cmd.replace(cfg.riviera_home, "${MIO_RIVIERA_HOME}")
+                run_script_file.write(f"{cmd}\n\n")
+        common.info(f"Wrote {run_script_path}")
+        with open(readme_path, 'w') as readme_file:
+            readme_file.write(f"1. Set ${bin_text}.  Ex: export {bin_text}=/tools/{bin_string}\n")
+            readme_file.write(f"2. Run: bash ./run.sh\n")
+        common.info(f"Wrote {readme_path}")
+    except Exception as e:
+        common.fatal(f"Failed to create bubble-wrap tarball: {e}")
+
 
 
 def kill_progress_bar():
@@ -270,6 +330,7 @@ def kill_progress_bar():
     if bar != None:
         bar(100000) # hack
 atexit.register(kill_progress_bar)
+
 
 
 def progress_bar():
@@ -286,6 +347,8 @@ def progress_bar():
                 tenth_seconds_waited = 0
                 seconds_waited += 1
             bar()
+
+
 
 
 def convert_cli_args_to_defines(sim_job):
@@ -537,6 +600,8 @@ def cmp_target_ip(ip, sim_job):
 
 
 def print_end_of_compilation_message(ip, sim_job):
+    if sim_job.dry_run:
+        return
     ip_str = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     if sim_job.elaborate:
@@ -553,6 +618,8 @@ def print_end_of_compilation_message(ip, sim_job):
 
 
 def print_end_of_elaboration_message(ip, sim_job):
+    if sim_job.dry_run:
+        return
     ip_str = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     if sim_job.simulate:
@@ -569,6 +636,8 @@ def print_end_of_elaboration_message(ip, sim_job):
 
 
 def print_end_of_simulation_message(ip, sim_job):
+    if sim_job.dry_run:
+        return
     ip_str = f"{ip.vendor}/{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     results_path = sim_job.results_path

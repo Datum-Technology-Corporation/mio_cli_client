@@ -9,6 +9,7 @@ from mio import cfg
 from mio import sim
 from jinja2 import Template
 from fusesoc import main as fsoc
+from alive_progress import alive_bar
 import fusesoc
 import atexit
 import pathlib
@@ -22,6 +23,7 @@ from yaml.loader import SafeLoader
 from threading import BoundedSemaphore
 
 eda_processes = []
+bar = None
 
 vivado_default_compilation_args  = ["--incr", "-sv"]
 metrics_default_compilation_args = ["+acc+b", "-suppress MultiBlockWrite:ReadingOutputModport:UndefinedMacro"]
@@ -83,18 +85,20 @@ def compile_fsoc_core(flist_path, core, sim_job):
     timestamp_start = common.timestamp()
     var_name = "MIO_" + core.sname.replace("-", "_").upper() + "_SRC_PATH"
     os.environ[var_name] = core.dir
+    sim_job.bwrap_flists[var_name] = "$PROJECT_ROOT_DIR/" + os.path.relpath(core.dir, cfg.project_dir)
     common.dbg(f"FuseSoC env var '{var_name}'='{core.dir}'")
     vendor = "@fsoc"
     log_file_path = compile_flist(vendor, core.sname, flist_path, [], sim_job, local=True)
-    timestamp_end = common.timestamp()
-    errors = scan_cmp_log_file_for_errors(log_file_path, sim_job)
-    if len(errors):
-        common.error("Errors during compilation of FuseSoC core '" + core.name + "':")
-        for error in errors:
-            common.error("  " + error)
-        sim.kill_progress_bar()
-        common.fatal("Stopping due to compilation.")
-    log_cmp_history_fsoc(core, log_file_path, sim_job, timestamp_start, timestamp_end)
+    if not sim_job.dry_run:
+        timestamp_end = common.timestamp()
+        errors = scan_cmp_log_file_for_errors(log_file_path, sim_job)
+        if len(errors):
+            common.error("Errors during compilation of FuseSoC core '" + core.name + "':")
+            for error in errors:
+                common.error("  " + error)
+            sim.kill_progress_bar()
+            common.fatal("Stopping due to compilation.")
+        log_cmp_history_fsoc(core, log_file_path, sim_job, timestamp_start, timestamp_end)
     return log_file_path
 
 
@@ -104,7 +108,19 @@ def compile_ip(ip, sim_job):
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     flist_path = get_ip_flist_path(ip, sim_job)
     deps_list  = get_dep_list(ip, sim_job)
-    if ip.is_global and (sim_job.simulator == common.simulators_enum.METRICS):
+    if sim_job.bwrap:
+        if ip.is_global:
+            if ip.is_encrypted:
+                common.copy_directory(ip.path + "/" + ip.src_path + "." + sim_str, f"{cfg.temp_path}/{ip_dir}")
+            else:
+                common.copy_directory(ip.path + "/" + ip.src_path, f"{cfg.temp_path}/{ip_dir}")
+            path = "${PROJECT_ROOT_DIR}/.mio/temp/" + ip_dir
+        else:
+            if ip.is_encrypted:
+                path = "${PROJECT_ROOT_DIR}/" + os.path.relpath(ip.path + "/" + ip.src_path + "." + sim_str, cfg.project_dir)
+            else:
+                path = "${PROJECT_ROOT_DIR}/" + os.path.relpath(ip.path + "/" + ip.src_path, cfg.project_dir)
+    elif ip.is_global and (sim_job.simulator == common.simulators_enum.METRICS):
         if ip.is_encrypted:
             common.copy_directory(ip.path + "/" + ip.src_path + "." + sim_str, f"{cfg.temp_path}/{ip_dir}")
             path = ".mio/temp/" + ip_dir
@@ -117,22 +133,29 @@ def compile_ip(ip, sim_job):
         else:
             path = ip.path + "/" + ip.src_path
     
-    if sim_job.simulator == common.simulators_enum.METRICS:
+    if (not sim_job.bwrap) and sim_job.simulator == common.simulators_enum.METRICS:
+        set_uvm_version(sim_job)
         flist_path = os.path.relpath(flist_path, cfg.project_dir)
     
-    os.environ['MIO_' + ip.name.upper() + '_SRC_PATH'] = path
+    if sim_job.bwrap:
+        flist_path = os.path.relpath(flist_path, cfg.project_dir)
+    
+    flist_env_var_name = 'MIO_' + ip.name.upper() + '_SRC_PATH'
+    os.environ[flist_env_var_name] = path
+    sim_job.bwrap_flists[flist_env_var_name] = path
     timestamp_start = common.timestamp()
     log_file_path = compile_flist(ip.vendor, ip.name, flist_path, deps_list, sim_job, ip.is_local)
-    timestamp_end = common.timestamp()
-    errors = scan_cmp_log_file_for_errors(log_file_path, sim_job)
-    if len(errors):
-        common.error("Errors during compilation of IP '" + ip_str + "':")
-        for error in errors:
-            common.error("  " + error)
-        sim.kill_progress_bar()
-        common.fatal("Stopping due to compilation errors. Full log: " + log_file_path)
-    log_cmp_history_ip(ip, log_file_path, sim_job, timestamp_start, timestamp_end)
-    ip.is_compiled[sim_job.simulator] = True
+    if not sim_job.dry_run:
+        timestamp_end = common.timestamp()
+        errors = scan_cmp_log_file_for_errors(log_file_path, sim_job)
+        if len(errors):
+            common.error("Errors during compilation of IP '" + ip_str + "':")
+            for error in errors:
+                common.error("  " + error)
+            sim.kill_progress_bar()
+            common.fatal("Stopping due to compilation errors. Full log: " + log_file_path)
+        log_cmp_history_ip(ip, log_file_path, sim_job, timestamp_start, timestamp_end)
+        ip.is_compiled[sim_job.simulator] = True
     return log_file_path
 
 
@@ -143,17 +166,18 @@ def compile_vivado_project(ip, sim_job):
     dep_list = get_dep_list(ip, sim_job)
     timestamp_start = common.timestamp()
     log_file_paths = do_compile_vivado_project(ip, dep_list, sim_job)
-    timestamp_end = common.timestamp()
-    errors = scan_cmp_log_file_for_errors(log_file_paths[0], sim_job)
-    errors.append(scan_cmp_log_file_for_errors(log_file_paths[1], sim_job))
-    if len(errors):
-        common.error("Errors during compilation of Vivado Project IP '" + ip_str + "':")
-        for error in errors:
-            common.error("  " + error)
-        sim.kill_progress_bar()
-        common.fatal("Stopping due to compilation errors. Logs: " + log_file_paths[0] + " & " + log_file_paths[0])
-    log_cmp_history_vivado_project(ip, log_file_paths[0], log_file_paths[1], sim_job, timestamp_start, timestamp_end)
-    ip.is_compiled[sim_job.simulator] = True
+    if not sim_job.dry_run:
+        timestamp_end = common.timestamp()
+        errors = scan_cmp_log_file_for_errors(log_file_paths[0], sim_job)
+        errors.append(scan_cmp_log_file_for_errors(log_file_paths[1], sim_job))
+        if len(errors):
+            common.error("Errors during compilation of Vivado Project IP '" + ip_str + "':")
+            for error in errors:
+                common.error("  " + error)
+            sim.kill_progress_bar()
+            common.fatal("Stopping due to compilation errors. Logs: " + log_file_paths[0] + " & " + log_file_paths[0])
+        log_cmp_history_vivado_project(ip, log_file_paths[0], log_file_paths[1], sim_job, timestamp_start, timestamp_end)
+        ip.is_compiled[sim_job.simulator] = True
     return log_file_paths
 
 
@@ -173,16 +197,17 @@ def elaborate(ip, sim_job):
     common.create_dir(elab_out)
     timestamp_start = common.timestamp()
     log_file_path = do_elaborate(ip, sim_job, elab_out)
-    timestamp_end = common.timestamp()
-    errors = scan_elab_log_file_for_errors(log_file_path, sim_job)
-    if len(errors):
-        common.error("Errors during elaboration of IP '" + ip_str + "':")
-        for error in errors:
-            common.error("  " + error)
-        sim.kill_progress_bar()
-        common.fatal("Stopping due to elaboration errors. Full log: " + log_file_path)
-    log_elab_history(ip, log_file_path, sim_job, timestamp_start, timestamp_end)
-    ip.is_elaborated[sim_job.simulator] = True
+    if not sim_job.dry_run:
+        timestamp_end = common.timestamp()
+        errors = scan_elab_log_file_for_errors(log_file_path, sim_job)
+        if len(errors):
+            common.error("Errors during elaboration of IP '" + ip_str + "':")
+            for error in errors:
+                common.error("  " + error)
+            sim.kill_progress_bar()
+            common.fatal("Stopping due to elaboration errors. Full log: " + log_file_path)
+        log_elab_history(ip, log_file_path, sim_job, timestamp_start, timestamp_end)
+        ip.is_elaborated[sim_job.simulator] = True
     return elab_out
 
 
@@ -205,9 +230,10 @@ def simulate(ip, sim_job):
         sim_out = cfg.sim_output_dir + "/" + sim_str + "/elab_out/single_sim/" + ip_dir_name
         common.create_dir(sim_out)
     do_simulate(ip, sim_job, sim_out)
-    sem.acquire()
-    log_sim_end_history(ip, sim_job, start, common.timestamp())
-    sem.release()
+    if not sim_job.dry_run:
+        sem.acquire()
+        log_sim_end_history(ip, sim_job, start, common.timestamp())
+        sem.release()
 
 
 def init_metrics_workspace():
@@ -245,6 +271,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
     common.create_dir(cmp_out)
     common.create_dir(sim_out)
     compilation_log_path = cfg.sim_dir + "/cmp/" + ip_dir_name + "." + sim_str + ".cmp.log"
+    compilation_command_file = f"{ip_dir_name}.{sim_str}.cmp.cmd.txt"
     
     if sim_job.simulator == common.simulators_enum.VIVADO:
         arg_list += vivado_default_compilation_args
@@ -256,7 +283,8 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list += deps_list
         arg_list.append(f"--work {name}={cmp_out}")
         arg_list.append("--log "  + compilation_log_path)
-        launch_eda_bin(cfg.vivado_home + "/xvlog", arg_list, wd=sim_out, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "xvlog", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vivado_home + "/xvlog", arg_list, wd=sim_out, output=cfg.dbg, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.VCS:
         arg_list += vcs_default_compilation_args
@@ -265,7 +293,8 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list += cmp_args_list
         arg_list += deps_list
         arg_list.append("-l "  + compilation_log_path)
-        launch_eda_bin(cfg.vcs_home + "/vcs", arg_list, wd=sim_out, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "vcs", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vcs_home + "/vcs", arg_list, wd=sim_out, output=cfg.dbg, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.METRICS:
         arg_list += metrics_default_compilation_args
@@ -286,18 +315,24 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list_str = ""
         for arg in arg_list:
             arg_list_str = arg_list_str + f" {arg}"
-        arg_list = [f"dvlcom -a '{arg_list_str}'"]
+        if cfg.dbg:
+            arg_list = [f"dvlcom -v -a '{arg_list_str}'"]
+        else:
+            arg_list = [f"dvlcom -a '{arg_list_str}'"]
         #launch_eda_bin(cfg.metrics_home + "/mdc", ["initialize"], wd=cfg.project_dir, output=True) # TODO Add project.yml and store this in there
-        launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, wd=cfg.project_dir, output=cfg.dbg)
-        launch_eda_bin(cfg.metrics_home + "/mdc", ["download", mtr_compilation_log_path], wd=cfg.project_dir, output=cfg.dbg)
-        common.move_file(f"{cfg.project_dir}/_downloaded_{mtr_compilation_log_path}", compilation_log_path)
+        write_cmd_to_disk(sim_job, "mdc", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, wd=cfg.project_dir, output=cfg.dbg, dry_run=sim_job.dry_run)
+        launch_eda_bin(cfg.metrics_home + "/mdc", ["download", mtr_compilation_log_path], wd=cfg.project_dir, output=cfg.dbg, dry_run=sim_job.dry_run)
+        if not sim_job.dry_run:
+            common.move_file(f"{cfg.project_dir}/_downloaded_{mtr_compilation_log_path}", compilation_log_path)
         
     elif sim_job.simulator == common.simulators_enum.XCELIUM:
         arg_list += xcelium_default_compilation_args
         arg_list.append(license_macros_file_path);
         arg_list.append("-f " + flist_path)
         # TODO Add compilation output argument for nc
-        launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd=sim_out, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "xrun", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd=sim_out, output=cfg.dbg, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.QUESTA:
         os.environ['MIO_UVM_HOME'] = f"$MIO_QUESTA_HOME/../verilog_src/uvm-{cfg.uvm_version}"
@@ -309,14 +344,16 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list.append(f"-Ldir {cmp_out_dir}")
         arg_list.append("-l "  + compilation_log_path)
         arg_list.append(f"-work {name}")
-        launch_eda_bin(cfg.questa_home + "/vlog", arg_list, wd=sim_out, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "vlog", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.questa_home + "/vlog", arg_list, wd=sim_out, output=cfg.dbg)
         
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
         arg_list += riviera_default_compilation_args
         arg_list.append(license_macros_file_path);
         arg_list.append("-f " + flist_path)
         # TODO Add compilation output argument for riviera
-        launch_eda_bin(cfg.riviera_home + "/vlog", arg_list, wd=sim_out, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "vlog", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.riviera_home + "/vlog", arg_list, wd=sim_out, output=cfg.dbg, dry_run=sim_job.dry_run)
     
     return compilation_log_path
 
@@ -345,8 +382,12 @@ def do_compile_vivado_project(ip, deps, sim_job, local):
         vlog_arg_list += convert_compilation_args(sim_job)
         vlog_arg_list += convert_deps_to_args(deps, sim_job)
         vhdl_arg_list.append("--log " + vhdl_compilation_log_path)
-        launch_eda_bin(cfg.vivado_home + "/xvlog", vlog_arg_list, wd=sim_out)
-        launch_eda_bin(cfg.vivado_home + "/xvhdl", vhdl_arg_list, wd=sim_out)
+        compilation_command_file = f"{ip_dir_name}.{sim_str}.cmp.xvlog.cmd.txt"
+        write_cmd_to_disk(sim_job, "xvlog", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vivado_home + "/xvlog", vlog_arg_list, wd=sim_out, dry_run=sim_job.dry_run)
+        compilation_command_file = f"{ip_dir_name}.{sim_str}.cmp.xvhdl.cmd.txt"
+        write_cmd_to_disk(sim_job, "xvhdl", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vivado_home + "/xvhdl", vhdl_arg_list, wd=sim_out, dry_run=sim_job.dry_run)
     else:
         common.fatal("Vivado Project IP are not yet compatible with simulator '" + sim_str + "'.")
     
@@ -368,7 +409,7 @@ def do_elaborate(ip, sim_job, wd):
     elaboration_log_path = cfg.sim_dir + "/elab/" + ip_dir_name + "." + sim_str + ".elab.log"
     cmp_out_dir = cfg.sim_output_dir + "/" + sim_str + "/cmp_out/"
     ip_cmp_path = cmp_out_dir + ip_dir_name
-    
+    elaboration_command_file = f"{ip_dir_name}.{sim_str}.elab.cmd.txt"
     
     if sim_job.simulator == common.simulators_enum.VIVADO:
         arg_list += def_list
@@ -391,12 +432,14 @@ def do_elaborate(ip, sim_job, wd):
             common.copy_file(so_libs[so_lib], f"{wd}/{so_lib}")
             arg_list.append(f"-sv_lib {so_lib}")
         
-        launch_eda_bin(cfg.vivado_home + "/xelab", arg_list, wd, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "xelab", arg_list, elaboration_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vivado_home + "/xelab", arg_list, wd, output=cfg.dbg, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.VCS:
         arg_list += vcs_default_elaboration_args
         # TODO Add elaboration output argument for vcs
-        launch_eda_bin(cfg.vcs_home + "/vcs", arg_list, wd, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "vcs", arg_list, elaboration_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vcs_home + "/vcs", arg_list, wd, output=cfg.dbg, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.METRICS:
         arg_list += metrics_default_elaboration_args
@@ -406,6 +449,8 @@ def do_elaborate(ip, sim_job, wd):
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
+        #arg_list.append(f"+incdir+%UVM_HOME%/src")
+        #arg_list.append(f"%UVM_HOME%/src/uvm_pkg.sv")
         
         if ip.vendor == "@global":
             arg_list.append(f"-genimage global__{ip.name}")
@@ -427,15 +472,21 @@ def do_elaborate(ip, sim_job, wd):
         arg_list_str = ""
         for arg in arg_list:
             arg_list_str = arg_list_str + f" {arg}"
-        arg_list = [f"dsim -a '{arg_list_str}'"]
-        launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, wd=cfg.project_dir, output=cfg.dbg)
-        launch_eda_bin(cfg.metrics_home + "/mdc", ["download", mtr_elaboration_log_path], wd=cfg.project_dir, output=cfg.dbg)
-        common.move_file(f"{cfg.project_dir}/_downloaded_{mtr_elaboration_log_path}", elaboration_log_path)
+        if cfg.dbg:
+            arg_list = [f"dsim -v -a '{arg_list_str}'"]
+        else:
+            arg_list = [f"dsim -a '{arg_list_str}'"]
+        write_cmd_to_disk(sim_job, "mdc", arg_list, elaboration_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, wd=cfg.project_dir, output=cfg.dbg, dry_run=sim_job.dry_run)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.metrics_home + "/mdc", ["download", mtr_elaboration_log_path], wd=cfg.project_dir, output=cfg.dbg, dry_run=sim_job.dry_run)
+        if not sim_job.dry_run:
+            common.move_file(f"{cfg.project_dir}/_downloaded_{mtr_elaboration_log_path}", elaboration_log_path)
         
     elif sim_job.simulator == common.simulators_enum.XCELIUM:
         arg_list += xcelium_default_elaboration_args
         # TODO Add elaboration output argument for nc
-        launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "xrun", arg_list, elaboration_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd, output=cfg.dbg, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.QUESTA:
         for construct in ip.hdl_src_top_constructs:
@@ -452,17 +503,20 @@ def do_elaborate(ip, sim_job, wd):
         arg_list.append(f"-o {ip.name}")
         arg_list.append(f"-l {elaboration_log_path}")
         arg_list.append(f"-Ldir {cmp_out_dir}")
-        launch_eda_bin(cfg.questa_home + "/vopt", arg_list, wd, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "vopt", arg_list, elaboration_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.questa_home + "/vopt", arg_list, wd, output=cfg.dbg, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
         arg_list += riviera_default_elaboration_args
         # TODO Add elaboration output argument for riviera
-        launch_eda_bin(cfg.riviera_home + "/vlog", arg_list, wd, output=cfg.dbg)
+        write_cmd_to_disk(sim_job, "vlog", arg_list, elaboration_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.riviera_home + "/vlog", arg_list, wd, output=cfg.dbg, dry_run=sim_job.dry_run)
     
     return elaboration_log_path
 
 
 def do_simulate(ip, sim_job, wd):
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
     ip_str = f"{ip.vendor}/{ip.name}"
     ip_dir_name = f"{ip.vendor}__{ip.name}"
     global sem
@@ -477,6 +531,7 @@ def do_simulate(ip, sim_job, wd):
     test_result_dir_template = Template(cfg.test_results_path_template)
     test = sim_job.test
     test_name = test_template.render(name=test)
+    simulation_command_file = f"{ip_dir_name}.{sim_str}.sim.cmd.txt"
     test_result_dir = test_result_dir_template.render(ip_vendor=ip.vendor, ip_name=ip.name, test_name=test, seed=sim_job.seed, args=plus_args_list_to_str_list(plus_args), args_present=args_present)
     plus_args["UVM_TESTNAME"] = test_name
     
@@ -581,14 +636,16 @@ def do_simulate(ip, sim_job, wd):
             arg_list.append("-ignore_coverage")
         arg_list.append(ip.name)
         arg_list.append("-sv_seed " + str(sim_job.seed))
+        write_cmd_to_disk(sim_job, "xsim", arg_list, simulation_command_file)
         sem.release()
-        launch_eda_bin(cfg.vivado_home + "/xsim", arg_list, wd, output=output)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vivado_home + "/xsim", arg_list, wd, output=output, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.VCS:
         arg_list += vcs_default_simulation_args
         # TODO Add simulation output argument for vcs
+        write_cmd_to_disk(sim_job, "simv", arg_list, simulation_command_file)
         sem.release()
-        launch_eda_bin(cfg.vcs_home + "/simv", arg_list, wd, output=output)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vcs_home + "/simv", arg_list, wd, output=output, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.METRICS:
         arg_list += metrics_default_simulation_args
@@ -604,23 +661,28 @@ def do_simulate(ip, sim_job, wd):
         arg_list_str = ""
         for arg in arg_list:
             arg_list_str = arg_list_str + f" {arg}"
-        arg_list = [f"dsim -a '{arg_list_str}'"]
+        if cfg.dbg:
+            arg_list = [f"dsim -v -a '{arg_list_str}'"]
+        else:
+            arg_list = [f"dsim -a '{arg_list_str}'"]
+        write_cmd_to_disk(sim_job, "mdc", arg_list, simulation_command_file)
         sem.release()
-        launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, wd=cfg.project_dir, output=output)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, wd=cfg.project_dir, output=output, dry_run=sim_job.dry_run)
         common.remove_file(f"{cfg.project_dir}/_downloaded_{mtr_simulation_log_path}")
-        launch_eda_bin(cfg.metrics_home + "/mdc", ["download", mtr_simulation_log_path], wd=cfg.project_dir)
-        common.move_file(f"{cfg.project_dir}/_downloaded_{mtr_simulation_log_path}", simulation_log_path)
-        
-        if sim_job.waves:
-            common.remove_file(f"{cfg.project_dir}/_downloaded_{test_result_dir}.vcd")
-            launch_eda_bin(cfg.metrics_home + "/mdc", ["download", f"{test_result_dir}.vcd"], wd=cfg.project_dir)
-            common.move_file(f"{cfg.project_dir}/_downloaded_{test_result_dir}.vcd", f"{tests_results_path}/waves.vcd")
+        sim_job.bwrap_commands += launch_eda_bin(cfg.metrics_home + "/mdc", ["download", mtr_simulation_log_path], wd=cfg.project_dir, dry_run=sim_job.dry_run)
+        if not sim_job.dry_run:
+            common.move_file(f"{cfg.project_dir}/_downloaded_{mtr_simulation_log_path}", simulation_log_path)
+            if sim_job.waves:
+                common.remove_file(f"{cfg.project_dir}/_downloaded_{test_result_dir}.vcd")
+                sim_job.bwrap_commands += launch_eda_bin(cfg.metrics_home + "/mdc", ["download", f"{test_result_dir}.vcd"], wd=cfg.project_dir, dry_run=sim_job.dry_run)
+                common.move_file(f"{cfg.project_dir}/_downloaded_{test_result_dir}.vcd", f"{tests_results_path}/waves.vcd")
         
     elif sim_job.simulator == common.simulators_enum.XCELIUM:
         arg_list += xcelium_default_simulation_args
         # TODO Add simulation output argument for nc
+        write_cmd_to_disk(sim_job, "xrun", arg_list, simulation_command_file)
         sem.release()
-        launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd, output=output)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd, output=output, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.QUESTA:
         arg_list += questa_default_simulation_args
@@ -628,16 +690,68 @@ def do_simulate(ip, sim_job, wd):
         arg_list.append("-l " + simulation_log_path)
         arg_list.append("-sv_seed " + str(sim_job.seed))
         arg_list.append(f" {ip.name}")
+        write_cmd_to_disk(sim_job, "vsim", arg_list, simulation_command_file)
         sem.release()
-        launch_eda_bin(cfg.questa_home + "/vsim", arg_list, wd, output=output)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.questa_home + "/vsim", arg_list, wd, output=output, dry_run=sim_job.dry_run)
         
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
         arg_list += riviera_default_simulation_args
         # TODO Add simulation output argument for riviera
+        write_cmd_to_disk(sim_job, "vsim", arg_list, simulation_command_file)
         sem.release()
-        launch_eda_bin(cfg.riviera_home + "/vsim", arg_list, wd, output=output)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.riviera_home + "/vsim", arg_list, wd, output=output, dry_run=sim_job.dry_run)
     
     sim_job.sim_log_file_path = simulation_log_path
+
+
+def write_cmd_to_disk(sim_job, executable_name, arg_list, command_filename):
+    arg_list_str = ""
+    for arg in arg_list:
+        arg_list_str = f"{arg_list_str} {arg}"
+    if sim_job.simulator == common.simulators_enum.VIVADO:
+        command_str = f"$MIO_VIVADO_HOME/{executable_name}{arg_list_str}"
+    elif sim_job.simulator == common.simulators_enum.METRICS:
+        command_str = f"$MIO_METRICS_HOME/{executable_name}{arg_list_str}"
+    elif sim_job.simulator == common.simulators_enum.VCS:
+        command_str = f"$MIO_VCS_HOME/{executable_name}{arg_list_str}"
+    elif sim_job.simulator == common.simulators_enum.QUESTA:
+        command_str = f"$MIO_QUESTA_HOME/{executable_name}{arg_list_str}"
+    elif sim_job.simulator == common.simulators_enum.XCELIUM:
+        command_str = f"$MIO_XCELIUM_HOME/{executable_name}{arg_list_str}"
+    elif sim_job.simulator == common.simulators_enum.RIVIERA:
+        command_str = f"$MIO_RIVIERA_HOME/{executable_name}{arg_list_str}"
+    
+    try:
+        path = cfg.temp_path + "/" + command_filename
+        cmd_file = open(path, 'w')
+        cmd_file.write(command_str)
+        cmd_file.close()
+    except Exception as e:
+        common.fatal(f"Could not write command to disk: {e}")
+
+
+def set_uvm_version(sim_job):
+    found_uvm_ver = False
+    if sim_job.simulator == common.simulators_enum.METRICS:
+        config_path = cfg.project_dir + "/.mdc/config.yml"
+        try:
+            with open(config_path, 'r') as cfg_file:
+                cfg_yaml = yaml.load(cfg_file, Loader=SafeLoader)
+                if 'toolchain' not in cfg_yaml:
+                    cfg_yaml['toolchain'] = {}
+                if 'packages' not in cfg_yaml['toolchain']:
+                    cfg_yaml['toolchain']['packages'] = []
+                for pkg in cfg_yaml['toolchain']['packages']:
+                    if pkg['name'] == 'uvm':
+                        found_uvm_ver = True
+                        pkg['version'] = cfg.uvm_version
+                        break
+                if not found_uvm_ver:
+                    cfg_yaml['toolchain']['packages'].append({"name":"uvm", "version":cfg.uvm_version})
+            with open(config_path, 'w') as cfg_file_write:
+                yaml.dump(cfg_yaml, cfg_file_write)
+        except Exception as e:
+            common.fatal(f"Failed to set UVM version for Metrics simulator: {e}")
 
 
 def dut_elab_to_arg_list(ip, sim_job):
@@ -665,7 +779,7 @@ def dut_elab_to_arg_list(ip, sim_job):
             common.fatal("ERROR: Unable to find FuseSoC core output for '" + ip.dut_fsoc_name + "': " + str(e))
     else:
         dut_ip = ip.dut.target_ip_model
-        dut_ip_dir_name = f"{ip.vendor}__{ip.name}"
+        dut_ip_dir_name = f"{dut_ip.vendor}__{dut_ip.name}"
         if dut_ip.sub_type == "vivado":
             if sim_job.simulator != common.simulators_enum.VIVADO:
                 common.fatal("Vivado Projects are currently only compatible with the Vivado simulator.")
@@ -674,13 +788,18 @@ def dut_elab_to_arg_list(ip, sim_job):
             for lib in dut_ip.vproj_libs:
                 args.append("-L " + lib)
         else:
-            if sim_job.simulator == common.simulators_enum.METRICS:
-                lib_str = f"-L {dut_ip.vendor}__{dut_ip.name}"
-            elif sim_job.simulator == common.simulators_enum.QUESTA:
-                lib_str = f"-L {dut_ip.vendor}__{dut_ip.name}"
-            else:
-                lib_str = "-L " + dut_ip.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/" + dut_ip_dir_name
-            args.append(lib_str)
+            # Performed by get_dep_list()
+            pass
+            #if sim_job.simulator == common.simulators_enum.METRICS:
+            #    if dut_ip.vendor == "@global":
+            #        lib_str = f"-L global__{dut_ip.name}"
+            #    else:
+            #        lib_str = f"-L {dut_ip.vendor}__{dut_ip.name}"
+            #elif sim_job.simulator == common.simulators_enum.QUESTA:
+            #    lib_str = f"-L {dut_ip.vendor}__{dut_ip.name}"
+            #else:
+            #    lib_str = "-L " + dut_ip.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/" + dut_ip_dir_name
+            #args.append(lib_str)
     common.dbg("DUT args list: " + str(args))
     return args
 
@@ -855,17 +974,19 @@ def convert_deps_to_args(deps, sim_job):
     args = []
     for dep in deps:
         if dep.name != "uvm":
-            if dep.vendor == "@global":
-                dep_dir_name = f"global__{dep.name}"
-            elif dep.vendor == "@fsoc":
-                dep_dir_name = f"fsoc__{dep.name}"
-            else:
-                dep_dir_name = f"{dep.vendor}__{dep.name}"
             if sim_job.simulator == common.simulators_enum.METRICS:
+                if dep.vendor == "@global":
+                    dep_dir_name = f"global__{dep.name}"
+                elif dep.vendor == "@fsoc":
+                    dep_dir_name = f"fsoc__{dep.name}"
+                else:
+                    dep_dir_name = f"{dep.vendor}__{dep.name}"
                 lib_str = f"-L {dep_dir_name}"
             elif sim_job.simulator == common.simulators_enum.QUESTA:
+                dep_dir_name = f"{dep.vendor}__{dep.name}"
                 lib_str = f"-L {dep_dir_name}"
             else:
+                dep_dir_name = f"{dep.vendor}__{dep.name}"
                 lib_str = "-L " + dep.name + "=" + cfg.sim_output_dir + "/" + sim_str + "/cmp_out/" + dep_dir_name
             args.append(lib_str)
     return args
@@ -889,7 +1010,7 @@ def get_incdir_list(deps, sim_job):
     incdir_list = []
     for dep in deps:
         for dir in dep.hdl_src_directories:
-            if dep.is_global and sim_job.simulator == common.simulators_enum.METRICS:
+            if dep.is_global and (sim_job.bwrap or sim_job.simulator == common.simulators_enum.METRICS):
                 src_path = f"{cfg.temp_path}/{dep.vendor}__{dep.name}/{dir}"
             else:
                 if dep.is_encrypted:
@@ -899,7 +1020,7 @@ def get_incdir_list(deps, sim_job):
             if sim_job.simulator == common.simulators_enum.VIVADO:
                 incdir_list.append("-i " + src_path)
             else:
-                if sim_job.simulator == common.simulators_enum.METRICS:
+                if (sim_job.bwrap or sim_job.simulator == common.simulators_enum.METRICS):
                     src_path = os.path.relpath(src_path, cfg.project_dir)
                 incdir_list.append("+incdir+" + src_path)
     return incdir_list
@@ -1031,6 +1152,7 @@ def invoke_fsoc(ip, core, sim_job):
 
 
 def encrypt_tree(ip_name, location, app):
+    global bar
     tcl_script = ""
     files      = []
     
@@ -1057,53 +1179,63 @@ def encrypt_tree(ip_name, location, app):
             common.fatal(f"Failed to write encryption script to disk: {e}")
         launch_eda_bin(cfg.vivado_home + "/vivado", [f"-mode batch", f" -source {tcl_script_path}"], cfg.temp_path, cfg.dbg)
     elif app == "mtr":
-        # TEMPORARY SOLUTION FROM METRICS UNTIL DVLENCRYPT IS SHIPPED WITH DSIM
         if not os.path.exists(cfg.encryption_key_path_metrics):
-            common.fatal(f"Could not find vivado encryption key at '{cfg.encryption_key_path_metrics}'")
-        
-        tcl_script += f"encrypt -key {cfg.encryption_key_path_metrics} -lang ver "  # TODO Add support for VHDL files
-        for file in files:
-            tcl_script += f"{file} "
-        common.dbg(f"TCL Script being passed to vivado for encryption: '\n{tcl_script}'")
-        tcl_script_path = cfg.temp_path + "/" + ip_name + ".encrypt.viv.tcl"
-        try:
-            f = open(tcl_script_path, "w")
-            f.write(tcl_script)
-            f.close()
-        except Exception as e:
-            common.fatal(f"Failed to write encryption script to disk: {e}")
-        launch_eda_bin(cfg.vivado_home + "/vivado", [f"-mode batch", f" -source {tcl_script_path}"], cfg.temp_path, cfg.dbg)
-    #elif app == "mtr":
-    #    if not os.path.exists(cfg.encryption_key_path_metrics):
-    #        common.fatal(f"Could not find metrics encryption key at '{cfg.encryption_key_path_metrics}'")
-    #    for file in files:
-    #        common.dbg(f"Processing file {file} ...")
-    #        file_r = open(file,mode='r')
-    #        file_text = file_r.read()
-    #        file_r.close()
-    #        file_w = open(file,mode='w')
-    #        file_w.write("`pragma protect begin\n")
-    #        file_w.write(file_text)
-    #        file_w.write("`pragma protect end")
-    #        file_w.close()
-    #        launch_eda_bin(cfg.metrics_home + "/dvlencrypt", [file, f"-i {cfg.encryption_key_path_metrics}", f"-o {file}"], cfg.temp_path, cfg.dbg)
+            common.fatal(f"Could not find metrics encryption key at '{cfg.encryption_key_path_metrics}'")
+        mtr_key_local_path = f"{cfg.temp_path}/metrics.key"
+        mtr_key_rel_path = os.path.relpath(mtr_key_local_path, cfg.temp_path)
+        common.copy_file(cfg.encryption_key_path_metrics, mtr_key_local_path)
+        num_files = len(files)
+        with alive_bar(num_files, bar = 'smooth', stats="{eta} estimated", monitor=True, elapsed=True) as bar:
+            for file in files:
+                filename = os.path.basename(file)
+                bar.text(f"{filename}")
+                file_dir_path = file.replace(filename, "")
+                file_dir_rel_path = os.path.relpath(file_dir_path, cfg.temp_path)
+                
+                file_r = open(file,mode='r')
+                file_text = file_r.read()
+                file_r.close()
+                file_w = open(file,mode='w')
+                file_w.write("`pragma protect begin\n")
+                file_w.write(file_text)
+                file_w.write("`pragma protect end")
+                file_w.close()
+                file_rel_path = os.path.relpath(file, cfg.temp_path)
+                args = [file_rel_path, f"-i {mtr_key_rel_path}", f"-o {file_rel_path}.e"]
+                arg_list_str = ""
+                for arg in args:
+                    arg_list_str = arg_list_str + f" {arg}"
+                if cfg.dbg:
+                    arg_list = [f"dvlencrypt -a '{arg_list_str}'"]
+                else:
+                    arg_list = [f"dvlencrypt -a '{arg_list_str}'"]
+                launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, cfg.temp_path, cfg.dbg)
+                launch_eda_bin(cfg.metrics_home + "/mdc", ["download", f"{file_rel_path}.e"], cfg.temp_path, cfg.dbg)
+                common.move_file(f"{cfg.temp_path}/_downloaded_{filename}.e", file)
+                bar()
     else:
-        common.fatal("Only vivado is currently supported for encryption")
+        common.fatal("Only vivado and metrics are currently supported for encryption")
 
 
-def launch_eda_bin(path, args, wd, output=False, shell=True):
+def launch_eda_bin(path, args, wd, output=False, shell=True, dry_run=False):
     global eda_processes
     args_str = ""
+    commands = []
     for arg in args:
         args_str = args_str + "  " + arg
-    os.chdir(wd)
-    common.dbg("Launching " + path + " with arguments '" + args_str + "' from " + wd)
-    if output:
-        p = subprocess.Popen(path + " " + args_str, shell=shell)
-    else:
-        p = subprocess.Popen(path + " " + args_str + " > /dev/null 2>&1", shell=shell)
-    eda_processes.append(p)
-    p.wait()
+    if not dry_run:
+        os.chdir(wd)
+        common.dbg("Launching " + path + " with arguments '" + args_str + "' from " + wd)
+        if output:
+            p = subprocess.Popen(path + " " + args_str, shell=shell)
+        else:
+            p = subprocess.Popen(path + " " + args_str + " > /dev/null 2>&1", shell=shell)
+        eda_processes.append(p)
+        p.wait()
+    rel_wd = os.path.relpath(wd, cfg.project_dir)
+    commands.append(f"cd {wd}")
+    commands.append(f"{path} {args_str}")
+    return commands
 
 
 def kill_all_processes():

@@ -503,7 +503,7 @@ class IP:
         dict["vproj_vlog"]                 = self.vproj_vlog
         dict["vproj_vhdl"]                 = self.vproj_vhdl
         
-        if self.has_dut:
+        if self.has_dut and (self.dut != None):
             dict['dut_vendor']  = self.dut.vendor
             dict['dut_name']    = self.dut.target_ip
             dict['dut_version'] = self.dut.semver

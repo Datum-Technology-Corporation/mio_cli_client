@@ -34,9 +34,10 @@ import random
 import pathlib
 
 
-uvm_levels = ["none","low","medium","high","debug"]
-simulators = ["viv","mtr","vcs","xcl","qst","riv"]
-commands   = ["clean", "cov", "doctor", "dox", "init" ,"install", "login", "new", "package", "publish", "regr", "results", "sim"]
+uvm_levels      = ["none","low","medium","high","debug"]
+simulators      = ["viv","mtr","vcs","xcl","qst","riv"]
+commands        = ["clean", "cov", "doctor", "dox", "init" ,"install", "login", "new", "package", "publish", "regr", "results", "sim", "!"]
+repeat_commands = ["sim"]
 
 
 def main():
@@ -137,6 +138,12 @@ def main():
         user.login()
         sim.main(sim_job)
         common.exit()
+    if cli_args.command == '!':
+        sim_job = create_repeat_sim_job(cli_args)
+        cache.check_ip(sim_job.vendor, sim_job.ip)
+        user.login()
+        sim.main(sim_job)
+        common.exit()
     if cli_args.command == 'regr':
         cache.check_ip_str(cli_args.ip.lower())
         regr.main(cli_args.ip.lower(), cli_args.regr.lower(), cli_args.app, cli_args.dry)
@@ -200,6 +207,10 @@ def build_parser():
     parser_sim.add_argument('-C'               , help='Force mio to compile target IP.  Can be combined with -F, -E and/or -S.'                            , action="store_true", required=False)
     parser_sim.add_argument('-F'               , help='Force mio to invoke FuseSoC on core file(s).  Can be combined with -C, -E and/or -S.'               , action="store_true", required=False)
     parser_sim.add_argument('-+', "--args"     , help='Add arguments for compilation (+define+NAME[=VALUE]) or simulation (+NAME[=VALUE])).', nargs='+'    , dest='add_args'    , required=False)
+    
+    parser_repeat = subparsers.add_parser('!', help=help_text.repeat_help_text, add_help=False)
+    parser_repeat.add_argument("cmd",  help='Command to be repeated', choices=repeat_commands)
+    parser_repeat.add_argument('-b', "--bwrap", help='Does not run command, only creates bash script and packages project.', action="store_true", default=False , required=False)
     
     parser_sim = subparsers.add_parser('regr', help=help_text.regr_help_text, add_help=False)
     parser_sim.add_argument('ip'         , help='Target IP')
@@ -296,6 +307,16 @@ def create_sim_job(cli_args):
     return sim_job
 
 
+def create_repeat_sim_job(cli_args):
+    last_cli_args = get_last_job()
+    parser        = build_parser()
+    sim_args      = parser.parse_args(last_cli_args)
+    sim_job = create_sim_job(sim_args)
+    sim_job.dry_run = cli_args.bwrap
+    sim_job.bwrap   = cli_args.bwrap
+    return sim_job
+
+
 def print_help_text():
     print(help_text.main_help_text)
     common.exit(False)
@@ -328,6 +349,8 @@ def print_cmd_help_text(cli_args):
         print(help_text.results_help_text)
     if cli_args.cmd == "sim":
         print(help_text.sim_help_text)
+    if cli_args.cmd == "!":
+        print(help_text.repeat_help_text)
 
 
 def print_version():
@@ -335,7 +358,25 @@ def print_version():
     common.exit(False)
 
 
+def get_last_job():
+    try:
+        if not os.path.exists(cfg.commands_file_path):
+            common.fatal(f"No command history exists!")
+        with open(cfg.commands_file_path, 'r') as yaml_file_read:
+            ymlr = yaml.load(yaml_file_read, Loader=SafeLoader)
+            timestamps = sorted(ymlr)
+            common.dbg(str(ymlr[timestamps[-1]]))
+            job = ymlr[timestamps[-1]]
+            job.pop(0)
+            return job
+    except Exception as e:
+        common.fatal("Failed to load command history from disk: " + str(e))
+
+
+
 def log_cli_args_to_disk():
+    if "!" in sys.argv:
+        return
     try:
         common.create_file(cfg.commands_file_path)
         with open(cfg.commands_file_path, 'r') as yaml_file_read:

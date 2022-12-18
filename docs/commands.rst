@@ -114,6 +114,29 @@ Examples
 
 
 
+repeat
+******
+
+Description
+^^^^^^^^^^^
+Repeats last command ran by mio.  Currently only supports Bubble-Wrap (--bwrap) usage for sending bug report tarballs to EDA vendors.  Currently only supported for `sim` command.
+
+Usage
+^^^^^
+``mio ! CMD [OPTIONS]``
+
+Options
+^^^^^^^
+================  =========================  ===========================
+``-b``            ``--bwrap``                Does not run command, only creates shell script to re-create the command without mio and creates a tarball of the project in the project root directory.  Currently only supports `sim` command.
+================  =========================  ===========================
+
+Examples
+^^^^^^^^
+==========================================================  =============
+``mio sim uvmt_example -t rand_stim -s 1 ; mio ! sim -b``   Run a simulation for `uvmt_example` and create a tarball that can be run by anyone using only bash.
+==========================================================  =============
+
 
 sim
 ***
@@ -275,36 +298,6 @@ Examples
 ``mio package uvma_my_ip ~``        Create compressed archive of IP ``uvma_my_ip`` under user's home directory.
 ``mio package uvma_my_ip ~/ip -n``  Process IP ``uvma_my_ip`` but do not create compressed archive.
 ==================================  ======
-
-
-publish
-*******
-
-
-Description
-^^^^^^^^^^^
-Packages and publishes an IP to the Moore.io IP Marketplace (https://mooreio.com).
-Currently only available to administrator accounts.
-
-Usage
-^^^^^
-``mio publish IP [OPTIONS]``
-
-Options
-^^^^^^^
-===============  =======================  ==========
-``-u USERNAME``  ``--username USERNAME``  Specifies Moore.io username (must be combined with ``-p``)
-``-p PASSWORD``  ``--password PASSWORD``  Specifies Moore.io password (must be combined with ``-u``)
-``-o ORG``       ``--org ORG``            Specifies Moore.io IP Marketplace Organization client name.  Commercial IPs only.
-===============  =======================  ==========
-
-Examples
-^^^^^^^^
-=======================================================  ======
-``mio publish uvma_my_ip``                               Publish IP ``uvma_my_ip``.
-``mio publish uvma_my_ip -u acme_jenkins -p )Kq3)fkqm``  Specify credentials for Jenkins job.
-``mio publish uvma_my_ip -o chip_inc``                   Publish IP ``uvma_my_ip`` for client ``chip_inc``.
-=======================================================  ======
 
 
 Results Management
