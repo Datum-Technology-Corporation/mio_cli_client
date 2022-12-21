@@ -332,7 +332,7 @@ class IP:
                 
                 if (self.is_licensed == True) and (self.is_encrypted == True):
                     if not ((self.vendor == "datum") and (self.name == "uvml_mio_lic")):
-                        dep_model = Dependency(self, "@datum/uvml_mio_lic", "^")
+                        dep_model = Dependency(self, "datum/uvml_mio_lic", "^")
                         self.dependencies.append(dep_model)
         except Exception as e:
             common.warning("IP file " + ip_yml_path + " is malformed and will be ignored: " + str(e))
@@ -562,7 +562,6 @@ class IP:
             dep.resolve()
     
     def get_ordered_deps(self):
-        # TODO Move to using poetry for resolving dependencies
         deps_list = []
         self.dependencies.sort(key= get_key)
         for dep in self.dependencies:

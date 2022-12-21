@@ -49,7 +49,7 @@ xcelium_default_simulation_args = []
 questa_default_simulation_args  = ["-64", "-c"]
 riviera_default_simulation_args = []
 
-vivado_cmp_log_error_regexes  = ["ERROR:"]
+vivado_cmp_log_error_regexes  = ["ERROR:", "CRITICAL WARNING:"]
 metrics_cmp_log_error_regexes = ["=E:", "=F:"]
 vcs_cmp_log_error_regexes     = ["Error-"]
 xcelium_cmp_log_error_regexes = ["*E "]
@@ -221,9 +221,9 @@ def simulate(ip, sim_job):
     log_sim_start_history(ip, sim_job, start)
     if sim_job.is_regression:
         ip_dir_name = f"{ip.vendor}__{ip.name}__{sim_job.regression_name}"
-        regr_sim_out_path = cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name
+        regr_sim_out_path = cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name + "/" + sim_job.regression_timestamp
         common.create_dir(regr_sim_out_path)
-        sim_out = regr_sim_out_path + "/" + sim_job.regression_timestamp
+        sim_out = regr_sim_out_path + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name + "/" + sim_job.regression_timestamp
         common.create_dir(sim_out)
     else:
         ip_dir_name = f"{ip.vendor}__{ip.name}"
@@ -399,8 +399,6 @@ def do_elaborate(ip, sim_job, wd):
     ip_dir_name = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     arg_list = []
-    if ip.has_dut:
-        arg_list += dut_elab_to_arg_list(ip, sim_job)
     def_list  = convert_defines(sim_job)
     elab_list = convert_elaboration_args(sim_job)
     deps_ip_list = get_dep_list(ip, sim_job)
@@ -412,6 +410,8 @@ def do_elaborate(ip, sim_job, wd):
     elaboration_command_file = f"{ip_dir_name}.{sim_str}.elab.cmd.txt"
     
     if sim_job.simulator == common.simulators_enum.VIVADO:
+        if ip.has_dut:
+            arg_list += dut_elab_to_arg_list(ip, sim_job)
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
@@ -437,6 +437,8 @@ def do_elaborate(ip, sim_job, wd):
         
     elif sim_job.simulator == common.simulators_enum.VCS:
         arg_list += vcs_default_elaboration_args
+        if ip.has_dut:
+            arg_list += dut_elab_to_arg_list(ip, sim_job)
         # TODO Add elaboration output argument for vcs
         write_cmd_to_disk(sim_job, "vcs", arg_list, elaboration_command_file)
         sim_job.bwrap_commands += launch_eda_bin(cfg.vcs_home + "/vcs", arg_list, wd, output=cfg.dbg, dry_run=sim_job.dry_run)
@@ -449,6 +451,8 @@ def do_elaborate(ip, sim_job, wd):
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
+        if ip.has_dut:
+            arg_list += dut_elab_to_arg_list(ip, sim_job)
         #arg_list.append(f"+incdir+%UVM_HOME%/src")
         #arg_list.append(f"%UVM_HOME%/src/uvm_pkg.sv")
         
@@ -484,6 +488,8 @@ def do_elaborate(ip, sim_job, wd):
         
     elif sim_job.simulator == common.simulators_enum.XCELIUM:
         arg_list += xcelium_default_elaboration_args
+        if ip.has_dut:
+            arg_list += dut_elab_to_arg_list(ip, sim_job)
         # TODO Add elaboration output argument for nc
         write_cmd_to_disk(sim_job, "xrun", arg_list, elaboration_command_file)
         sim_job.bwrap_commands += launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd, output=cfg.dbg, dry_run=sim_job.dry_run)
@@ -496,6 +502,8 @@ def do_elaborate(ip, sim_job, wd):
                 arg_list.append(ip.name + "." + construct)
         
         arg_list += questa_default_elaboration_args
+        if ip.has_dut:
+            arg_list += dut_elab_to_arg_list(ip, sim_job)
         arg_list += def_list
         arg_list += elab_list
         arg_list += deps_list
@@ -508,6 +516,8 @@ def do_elaborate(ip, sim_job, wd):
         
     elif sim_job.simulator == common.simulators_enum.RIVIERA:
         arg_list += riviera_default_elaboration_args
+        if ip.has_dut:
+            arg_list += dut_elab_to_arg_list(ip, sim_job)
         # TODO Add elaboration output argument for riviera
         write_cmd_to_disk(sim_job, "vlog", arg_list, elaboration_command_file)
         sim_job.bwrap_commands += launch_eda_bin(cfg.riviera_home + "/vlog", arg_list, wd, output=cfg.dbg, dry_run=sim_job.dry_run)
@@ -907,22 +917,27 @@ def gen_flist(ip, sim_job):
             top_files.append("${MIO_" + ip.name.upper() + "_SRC_PATH}/" + file)
     
     flist_path = cfg.temp_path + "/" + ip.vendor + "__" + ip.name + "." + simulator + ".flist"
-    gen_flist_file(sim_job.simulator, ip.vendor, ip.name, flist_path, defines, [], directories, top_files)
+    if ip.type == "dv":
+        include_uvm = True
+    else:
+        include_uvm = False
+    gen_flist_file(sim_job.simulator, ip.vendor, ip.name, flist_path, defines, [], directories, top_files, include_uvm)
     common.dbg(f"Using filelist '{flist_path}' for IP '{ip_str}'")
     
     return flist_path
 
 
-def gen_flist_file(simulator, ip_vendor, ip_name, path, defines, filelists, directories, files):
+def gen_flist_file(simulator, ip_vendor, ip_name, path, defines, filelists, directories, files, include_uvm):
     ip_str = f"{ip_vendor}/{ip_name}"
     sim_str = common.get_simulator_short_name(simulator)
     
-    if simulator == common.simulators_enum.METRICS:
-        directories.insert(0, "$UVM_HOME/src")
-        files      .insert(0, "$UVM_HOME/src/uvm_pkg.sv")
-    if simulator == common.simulators_enum.QUESTA:
-        directories.insert(0, "$(MIO_UVM_HOME)/src")
-        files      .insert(0, "$(MIO_UVM_HOME)/src/uvm_pkg.sv")
+    if include_uvm:
+        if simulator == common.simulators_enum.METRICS:
+            directories.insert(0, "$UVM_HOME/src")
+            files      .insert(0, "$UVM_HOME/src/uvm_pkg.sv")
+        if simulator == common.simulators_enum.QUESTA:
+            directories.insert(0, "$(MIO_UVM_HOME)/src")
+            files      .insert(0, "$(MIO_UVM_HOME)/src/uvm_pkg.sv")
     
     try:
         flist_template = cfg.templateEnv.get_template(f"{sim_str}.flist.j2")

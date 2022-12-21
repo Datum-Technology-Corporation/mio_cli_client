@@ -483,8 +483,9 @@ def main(ip_str, regression, simulator, dry_mode):
         ip = cache.get_anon_ip(name, True)
     else:
         ip = cache.get_ip(vendor, name, True)
-    if not cache.is_ip_installed(ip.vendor, ip.name):
-        common.fatal(f"You must first install this IP's dependencies: `mio install name`")
+    deps_to_install = len(ip.get_deps_to_install())
+    if deps_to_install > 0:
+        common.fatal(f"You must first install this IP's dependencies ({deps_to_install}): `mio install {name}`")
     
     timestamp_start = datetime.now()
     test_suite = scan_target_ip_for_test_suite(ip, simulator)

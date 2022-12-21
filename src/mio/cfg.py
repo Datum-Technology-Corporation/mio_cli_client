@@ -215,7 +215,7 @@ def load_tree():
     
     try:
         configuration = toml.load(builtin_toml_file_path)
-    except Except as e:
+    except Exception as e:
         common.fatal(f"Failed to parse Built-in Configuration ({builtin_toml_file_path}): {e}", False)
     if os.path.exists(user_toml_file_path):
         try:
@@ -225,6 +225,6 @@ def load_tree():
         common.dbg("Found Moore.io user TOML Configuration file at " + user_toml_file_path)
     try:
         common.merge_dict(configuration, toml.load(project_toml_file_path))
-    except Except as e:
+    except Exception as e:
         common.fatal(f"Failed to parse Project Configuration ({project_toml_file_path}): {e}", False)
     common.dbg("Final configuration:\n" + toml.dumps(configuration))

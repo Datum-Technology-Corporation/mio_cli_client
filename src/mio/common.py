@@ -36,11 +36,11 @@ class simulators_enum(Enum):
 
 def dbg(msg):
     if cfg.dbg:
-        print("\033[35m\033[1m[mio-dbg] " + msg + " \033[0m")
+        print("\033[32m\033[1m[mio-dbg] " + msg + " \033[0m")
 
 
 def info(msg):
-    print("\033[36m\033[1m[mio]\033[0m " + msg)
+    print("\033[34m\033[1m[mio]\033[0m " + msg)
 
 
 def warning(msg):
@@ -65,7 +65,7 @@ def banner(msg):
 
 
 def prompt(msg):
-    return input("\033[36m\033[1m[mio]\033[0m " + msg + " ")
+    return input("\033[35m\033[1m[mio]\033[0m " + msg + " ")
 
 
 def exit(dump_cache=True):

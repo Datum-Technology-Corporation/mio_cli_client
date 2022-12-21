@@ -154,9 +154,7 @@ def main(sim_job):
     cmp_ip_count = 0
     ip.update_is_compiled_elaborated(sim_job.simulator)
     if sim_job.compile:
-        cmp_ip_count = cmp_ip_count + cmp_dependencies(ip, sim_job)
         if ip.has_dut:
-        #if False:
             compile_dut = False
             if ip.dut_ip_type == "fsoc":
                 compile_dut = ip.dut_core.is_compiled[sim_job.simulator]
@@ -193,6 +191,9 @@ def main(sim_job):
                         cmp_dut(ip, sim_job)
                 else:
                     cmp_dut(ip, sim_job)
+        
+        cmp_ip_count = cmp_ip_count + cmp_dependencies(ip, sim_job)
+        
         if not ip.is_compiled[sim_job.simulator]:
             if not sim_job.is_regression:
                 common.banner("Compiling IP '" + ip_str + "'")
@@ -340,7 +341,7 @@ def bubble_wrap(sim_job):
                 if os.path.isdir(file_path):
                     if file in bwrap_ignore_dirs:
                         continue
-                common.info(f"Compressing {file}")
+                common.dbg(f"Compressing {file}")
                 tar.add(file_path, exclude=bwrap_exclude, arcname=file)
         common.info("Done")
         
@@ -368,15 +369,11 @@ def progress_bar():
     global bar
     global seconds_waited
     seconds = est_time
-    tenth_seconds_waited = 0
-    with alive_bar(seconds*10, bar = 'smooth', stats="{eta} estimated", monitor=False, elapsed=True) as bar:
+    with alive_bar(seconds, bar = 'smooth', stats="{eta} estimated", monitor=False, elapsed=True) as bar:
         bar.text("estimated")
-        for x in range(seconds*10):
-            time.sleep(0.1)
-            tenth_seconds_waited += 1
-            if (tenth_seconds_waited == 10):
-                tenth_seconds_waited = 0
-                seconds_waited += 1
+        for x in range(seconds):
+            time.sleep(1)
+            seconds_waited += 1
             bar()
 
 
