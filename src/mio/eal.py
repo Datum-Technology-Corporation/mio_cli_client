@@ -9,7 +9,7 @@ from mio import cfg
 from mio import sim
 from jinja2 import Template
 from fusesoc import main as fsoc
-from alive_progress import alive_bar
+from tqdm import tqdm
 import fusesoc
 import atexit
 import pathlib
@@ -1200,10 +1200,11 @@ def encrypt_tree(ip_name, location, app):
         mtr_key_rel_path = os.path.relpath(mtr_key_local_path, cfg.temp_path)
         common.copy_file(cfg.encryption_key_path_metrics, mtr_key_local_path)
         num_files = len(files)
-        with alive_bar(num_files, bar = 'smooth', stats="{eta} estimated", monitor=True, elapsed=True) as bar:
+        with tqdm(total=num_files) as pbar:
+        #with alive_bar(num_files, bar = 'smooth', stats="{eta} estimated", monitor=True, elapsed=True) as bar:
             for file in files:
                 filename = os.path.basename(file)
-                bar.text(f"{filename}")
+                pbar.set_description(f"{filename}")
                 file_dir_path = file.replace(filename, "")
                 file_dir_rel_path = os.path.relpath(file_dir_path, cfg.temp_path)
                 
@@ -1227,7 +1228,7 @@ def encrypt_tree(ip_name, location, app):
                 launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, cfg.temp_path, cfg.dbg)
                 launch_eda_bin(cfg.metrics_home + "/mdc", ["download", f"{file_rel_path}.e"], cfg.temp_path, cfg.dbg)
                 common.move_file(f"{cfg.temp_path}/_downloaded_{filename}.e", file)
-                bar()
+                pbar.update(1)
     else:
         common.fatal("Only vivado and metrics are currently supported for encryption")
 

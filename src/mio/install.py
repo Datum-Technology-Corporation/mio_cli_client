@@ -18,7 +18,7 @@ from pathlib import Path
 from base64 import b64decode
 import os
 import shutil
-from alive_progress import alive_bar
+from tqdm import tqdm
 
 
 base_url          = "https://mooreio.com"#"http://localhost:8080"
@@ -98,13 +98,14 @@ def install_ip(vendor, name, global_install, username="", password=""):
 def install_ip_dep_list(ip, ip_list, global_install, username="", password=""):
     versions = {}
     if len(ip_list) > 0:
-        with alive_bar(len(ip_list), bar = 'smooth') as bar:
+        #with alive_bar(len(ip_list), bar = 'smooth') as bar:
+        with tqdm(ip_list) as pbar:
             for dep_ip in ip_list:
                 vendor, name = common.parse_dep(dep_ip)
                 ip_str = f"{vendor}/{name}"
-                bar.text(ip_str)
+                pbar.set_description(ip_str)
                 versions[ip_str] = install_ip(vendor, name, global_install, username="", password="")
-                bar()
+                pbar.update(1)
         cache.scan_and_load_ip_metadata()
         update_lock_file(ip, versions)
 

@@ -20,7 +20,7 @@ from enum import Enum
 from yaml.loader import SafeLoader
 from datetime import datetime
 import hashlib
-from alive_progress import alive_bar
+from tqdm import tqdm
 from distutils.dir_util import copy_tree
 from distutils.dir_util import remove_tree
 

@@ -21,7 +21,7 @@ from pathlib import Path
 from base64 import b64encode
 import os
 import shutil
-from alive_progress import alive_bar
+from tqdm import tqdm
 import fileinput
 
 

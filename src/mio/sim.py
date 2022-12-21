@@ -3,6 +3,8 @@
 ########################################################################################################################
 
 
+
+
 from mio import cfg
 from mio import clean
 from mio import cov
@@ -13,7 +15,8 @@ from mio import common
 from mio import eal
 from mio import install
 from mio import doctor
-from alive_progress import alive_bar
+from tqdm import tqdm
+from tqdm import trange
 from threading import Thread
 from multiprocessing.pool import ThreadPool
 from threading import BoundedSemaphore
@@ -30,6 +33,7 @@ import tarfile
 
 
 
+
 bwrap_ignore_list = [
     "xsim.dir", ".str", ".Xil", ".jou", ".log", ".wdb", ".vcd", ".log", ".sdb", ".rlx", ".pb", ".o", ".png", ".jpg",
     ".svg", ".vsdx", ".docx", ".xlsx", ".pptx", ".md"
@@ -39,10 +43,11 @@ bwrap_ignore_dirs = [ ".git", ".svn" ]
 
 regex_define_pattern  = "\+define\+((?:\w|_|\d)+)(?:\=((?:\w|_|\d)+))?"
 regex_plusarg_pattern = "\+((?:\w|_|\d)+)(?:\=((?:\w|_|\d)+))?"
-bar = None
 seconds_waited = 0
 num_deps_to_compile = 0
 sem = BoundedSemaphore(1)
+pbar = None
+
 
 
 class StoppableThread(threading.Thread):
@@ -58,6 +63,8 @@ class StoppableThread(threading.Thread):
 
     def stopped(self):
         return self._stop_event.is_set()
+
+
 
 
 class SimulationJob:
@@ -100,6 +107,8 @@ class SimulationJob:
         self.elab_log_file_path = ""
         self.sim_log_file_path  = ""
         
+
+
 
 
 def main(sim_job):
@@ -181,8 +190,6 @@ def main(sim_job):
                             pool = ThreadPool(processes=1)
                             pool.apply_async(progress_bar)
                             cmp_dut(ip, sim_job)
-                            if bar != None:
-                                bar(est_time)
                             pool.terminate()
                             pool.join()
                         else:
@@ -213,8 +220,6 @@ def main(sim_job):
                         pool = ThreadPool(processes=1)
                         pool.apply_async(progress_bar)
                         cmp_target_ip(ip, sim_job)
-                        if bar != None:
-                            bar(est_time)
                         pool.terminate()
                         pool.join()
                     else:
@@ -248,8 +253,6 @@ def main(sim_job):
                     pool = ThreadPool(processes=1)
                     pool.apply_async(progress_bar)
                     eal.elaborate(ip, sim_job)
-                    if bar != None:
-                        bar(est_time)
                     pool.terminate()
                     pool.join()
                 else:
@@ -358,23 +361,26 @@ def bwrap_exclude(filename):
 
 
 def kill_progress_bar():
-    global bar
-    if bar != None:
-        bar(100000) # hack
+    pass
 atexit.register(kill_progress_bar)
 
 
 
 def progress_bar():
-    global bar
+    global pbar
     global seconds_waited
     seconds = est_time
-    with alive_bar(seconds, bar = 'smooth', stats="{eta} estimated", monitor=False, elapsed=True) as bar:
-        bar.text("estimated")
-        for x in range(seconds):
-            time.sleep(1)
-            seconds_waited += 1
-            bar()
+    with tqdm(total=100) as pbar:
+        for i in range(seconds):
+            sleep(1)
+            pbar.update(1)
+        
+    #with alive_bar(seconds, bar = 'smooth', stats="{eta} estimated", monitor=False, elapsed=True) as bar:
+    #    bar.text("estimated")
+    #    for x in range(seconds):
+    #        time.sleep(1)
+    #        seconds_waited += 1
+    #        bar()
 
 
 
@@ -559,12 +565,17 @@ def cmp_dependencies(ip, sim_job):
     defines = sim_job.cmp_args
     est_time = num_deps
     num_deps_to_compile = num_deps
-    with alive_bar(num_deps, bar = 'smooth', stats="{eta} estimated", monitor=True, elapsed=True) as bar:
-        for dep in deps_to_cmp:
+    with tqdm(deps_to_cmp) as pbar:
+        for dep in tqdm(deps_to_cmp):
             dep_str = f"{dep.vendor}/{dep.name}"
-            bar.text(dep_str)
+            pbar.set_description(dep_str)
             eal.compile_ip(dep, sim_job)
-            bar()
+    #with alive_bar(num_deps, bar = 'smooth', stats="{eta} estimated", monitor=True, elapsed=True) as bar:
+    #    for dep in deps_to_cmp:
+    #        dep_str = f"{dep.vendor}/{dep.name}"
+    #        bar.text(dep_str)
+    #        eal.compile_ip(dep, sim_job)
+    #        bar()
     return num_deps_to_compile
 
 

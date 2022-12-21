@@ -14,7 +14,7 @@ from mio import cli
 
 import yaml
 from yaml.loader import SafeLoader
-from alive_progress import alive_bar
+from tqdm import tqdm
 from multiprocessing import Process
 import threading
 from threading import BoundedSemaphore
@@ -523,7 +523,8 @@ def launch_sim_jobs(ip, test_suite, regression, sim_job_list, dry_mode):
     common.create_dir(cfg.regr_results_dir + "/" + cfg.target_ip_name + "_" + regression_name + "/" + test_suite.timestamp)
     sem = BoundedSemaphore(regression.max_jobs)
     sem_cfg = BoundedSemaphore(1)
-    with alive_bar(len(sim_job_list), bar = 'smooth') as bar:
+    with tqdm(sim_job_list) as bar:
+    #with alive_bar(len(sim_job_list), bar = 'smooth') as bar:
         for sim_job in sim_job_list:
             common.dbg("Launching test threads")
             thread = Thread(target=launch_test, args=(ip,test_suite,sim_job,dry_mode,))
@@ -580,7 +581,7 @@ def launch_test(ip, test_suite, sim_job, dry_mode):
     else:
         eal.simulate(ip, sim_job)
     common.dbg("Done simulating:\n" + str(sim_job))
-    bar()
+    bar.update(1)
     done_with_turn()
 
 
