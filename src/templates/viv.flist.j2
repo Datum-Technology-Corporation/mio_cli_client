@@ -4,12 +4,8 @@
 
 
 // Defines{% for define in defines %}
-{% if define.boolean %}--define {{ define.name }}
-{% else %}--define {{ define.name }}={{ define.value }}{% endif %}{% endfor %}
-
-
-// Filelists{% for filelist in filelists %}
--f {{ filelist }}{% endfor %}
+{% if define.boolean %}-d {{ define.name }}
+{% else %}-d {{ define.name }}={{ define.value }}{% endif %}{% endfor %}
 
 
 // Directories{% for dir in dirs %}
@@ -18,4 +14,3 @@
 
 // Files{% for file in files %}
 {{ file }}{% endfor %}
-

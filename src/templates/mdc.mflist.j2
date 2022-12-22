@@ -8,14 +8,10 @@
 {% else %}+define+{{ define.name }}={{ define.value }}{% endif %}{% endfor %}
 
 
+# UVM
++incdir+$UVM_HOME/src
+$UVM_HOME/src/uvm_pkg.sv
+
+
 # Filelists{% for filelist in filelists %}
 -F {{ filelist }}{% endfor %}
-
-
-# Directories{% for dir in dirs %}
-+incdir+{{ dir }}{% endfor %}
-
-
-# Files{% for file in files %}
-{{ file }}{% endfor %}
-

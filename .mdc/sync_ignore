@@ -1,0 +1,20 @@
+# Default file patterns to ignore when synchronizing files to the remote disk
+*.log
+
+# Waveform databases
+*.vcd
+*.mxd
+
+# Downloaded files from the remote disk
+_downloaded_*
+build
+dist
+docs
+./src
+tests/sim
+.mio/sim
+.project
+.gitignore
+.pydevproject
+.readthedocs.yaml
+*.md

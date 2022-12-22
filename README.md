@@ -57,7 +57,8 @@ Full Command List (`mio help CMD` for help on a specific command):
    IP and Credentials Management
       install        Install all IP dependencies from IP Marketplace
       login          Start session with IP Marketplace
-      package        Create a compressed archive of an IP
+      package        Create a compressed (and potentially encrypted) archive of an IP
+      publish        Publish IP to IP Marketplace (must have mio admin account)
    
    EDA Automation
       !              Repeat last command

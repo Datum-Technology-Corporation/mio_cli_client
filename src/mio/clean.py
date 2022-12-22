@@ -49,7 +49,7 @@ def main(ip_str, deep_clean):
 def clean_core(core):
     common.info(f"Deleting code and compiled code objects for FuseSoC core '{core.sname}'")
     common.remove_dir(cfg.sim_output_dir + '/viv/cmp_out/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/mtr/cmp_out/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/mdc/cmp_out/@fsoc__' + core.sname)
     common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_out/@fsoc__' + core.sname)
     common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_out/@fsoc__' + core.sname)
     common.remove_dir(cfg.sim_output_dir + '/qst/cmp_out/@fsoc__' + core.sname)
@@ -66,20 +66,20 @@ def clean_ip(ip, no_infos=False):
     ip_dir_name = f"{ip.vendor}__{ip.name}"
     
     common.remove_dir(cfg.sim_output_dir + '/viv/cmp_wd/' + ip_dir_name)
-    common.remove_dir(cfg.sim_output_dir + '/mtr/cmp_wd/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/mdc/cmp_wd/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_wd/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_wd/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/qst/cmp_wd/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/riv/cmp_wd/' + ip_dir_name)
     
     common.remove_dir(cfg.sim_output_dir + '/viv/elab_out/single_sim/' + ip_dir_name)
-    common.remove_dir(cfg.sim_output_dir + '/mtr/elab_out/single_sim/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/mdc/elab_out/single_sim/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/vcs/elab_out/single_sim/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/xcl/elab_out/single_sim/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/qst/elab_out/single_sim/' + ip_dir_name)
     
     common.remove_dir(cfg.sim_output_dir + '/viv/elab_out/regressions/' + ip_dir_name)
-    common.remove_dir(cfg.sim_output_dir + '/mtr/elab_out/regressions/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/mdc/elab_out/regressions/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/vcs/elab_out/regressions/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/xcl/elab_out/regressions/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/qst/elab_out/regressions/' + ip_dir_name)
@@ -95,7 +95,7 @@ def clean_ip(ip, no_infos=False):
         else:
             common.info(f"Deleting compiled code objects for external IP '{ip_str}'")
     common.remove_dir(cfg.sim_output_dir + '/viv/cmp_out/' + ip_dir_name)
-    common.remove_dir(cfg.sim_output_dir + '/mtr/cmp_out/' + ip_dir_name)
+    common.remove_dir(cfg.sim_output_dir + '/mdc/cmp_out/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_out/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_out/' + ip_dir_name)
     common.remove_dir(cfg.sim_output_dir + '/qst/cmp_out/' + ip_dir_name)

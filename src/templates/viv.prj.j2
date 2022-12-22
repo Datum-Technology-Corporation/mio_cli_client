@@ -4,13 +4,13 @@
 
 
 // Defines{% for define in defines %}
-{% if define.boolean %}+define+{{ define.name }}
-{% else %}+define+{{ define.name }}={{ define.value }}{% endif %}{% endfor %}
+{% if define.boolean %}--define {{ define.name }}
+{% else %}--define {{ define.name }}={{ define.value }}{% endif %}{% endfor %}
 
 
 // Directories{% for dir in dirs %}
-+incdir+{{ dir }}{% endfor %}
+-i {{ dir }}{% endfor %}
 
 
 // Files{% for file in files %}
-{{ file }}{% endfor %}
+sv {{ target }} {{ file }}{% endfor %}

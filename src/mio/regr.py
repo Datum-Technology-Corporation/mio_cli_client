@@ -52,7 +52,7 @@ class TestSuite:
         self.max_jobs          = []
         if simulator == "viv":
             self.simulator = common.simulators_enum.VIVADO
-        elif simulator == "mtr":
+        elif simulator == "mdc":
             self.simulator = common.simulators_enum.METRICS
         elif simulator == "vcs":
             self.simulator = common.simulators_enum.VCS
@@ -301,6 +301,7 @@ class TestSuite:
         sim_job.is_regression   = True
         sim_job.regression_name = cfg.regression_name
         sim_job.regression_timestamp = self.timestamp
+        sim_job.one_shot  = False
         sim_job.compile   = True
         sim_job.elaborate = False
         sim_job.simulate  = False
@@ -322,6 +323,7 @@ class TestSuite:
         sim_job.is_regression   = True
         sim_job.regression_name = cfg.regression_name
         sim_job.regression_timestamp = self.timestamp
+        sim_job.one_shot  = False
         sim_job.compile   = False
         sim_job.elaborate = True
         sim_job.simulate  = False

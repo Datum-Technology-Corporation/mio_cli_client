@@ -3,7 +3,7 @@
 ########################################################################################################################
 
 
-version = "1.0.3"
+version = "1.0.4"
 version_text = f"Moore.io CLI Client v{version}"
 
 
@@ -97,7 +97,7 @@ Options:
    -s SEED     , --seed      SEED       Positive Integer. Specify randomization seed  If none is provided, a random one will be picked.
    -v VERBOSITY, --verbosity VERBOSITY  Specifies UVM logging verbosity: none, low, medium, high, debug. [default: medium]
    -e ERRORS   , --errors    ERRORS     Specifies the number of errors at which compilation/elaboration/simulation is terminated.  [default: 10]
-   -a APP      , --app       APP        Specifies simulator application to use: viv, mtr, vcs, xcl, qst, riv. [default: viv]
+   -a APP      , --app       APP        Specifies simulator application to use: viv, mdc, vcs, xcl, qst, riv. [default: viv]
                                         WARNING: Only Vivado is currently supported. VCS and Metrics will be added in the
                                                  near future (2022/08/23).
    -w          , --waves                Enable wave capture to disk.

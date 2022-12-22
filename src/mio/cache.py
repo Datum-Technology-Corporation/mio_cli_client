@@ -74,7 +74,7 @@ class FCore:
         self.core_yml = yml['core_yml']
         self.is_installed = yml['is_installed']
         self.is_compiled[common.simulators_enum.VIVADO ] = yml['is_compiled']['viv']
-        self.is_compiled[common.simulators_enum.METRICS] = yml['is_compiled']['mtr']
+        self.is_compiled[common.simulators_enum.METRICS] = yml['is_compiled']['mdc']
         self.is_compiled[common.simulators_enum.VCS    ] = yml['is_compiled']['vcs']
         self.is_compiled[common.simulators_enum.XCELIUM] = yml['is_compiled']['xcl']
         self.is_compiled[common.simulators_enum.QUESTA ] = yml['is_compiled']['qst']
@@ -91,7 +91,7 @@ class FCore:
         dict['is_installed'] = self.is_installed
         dict['is_compiled'] = {}
         dict['is_compiled']['viv'] = self.is_compiled[common.simulators_enum.VIVADO ]
-        dict['is_compiled']['mtr'] = self.is_compiled[common.simulators_enum.METRICS]
+        dict['is_compiled']['mdc'] = self.is_compiled[common.simulators_enum.METRICS]
         dict['is_compiled']['vcs'] = self.is_compiled[common.simulators_enum.VCS    ]
         dict['is_compiled']['xcl'] = self.is_compiled[common.simulators_enum.XCELIUM]
         dict['is_compiled']['qst'] = self.is_compiled[common.simulators_enum.QUESTA ]
@@ -247,8 +247,8 @@ class IP:
                         self.simulators_supported[common.simulators_enum.VIVADO] = yml['ip']['simulators-supported']['viv'].strip().lower()
                     if 'vcs' in yml['ip']['simulators-supported']:
                         self.simulators_supported[common.simulators_enum.VCS] = yml['ip']['simulators-supported']['vcs'].strip().lower()
-                    if 'mtr' in yml['ip']['simulators-supported']:
-                        self.simulators_supported[common.simulators_enum.METRICS] = yml['ip']['simulators-supported']['mtr'].strip().lower()
+                    if 'mdc' in yml['ip']['simulators-supported']:
+                        self.simulators_supported[common.simulators_enum.METRICS] = yml['ip']['simulators-supported']['mdc'].strip().lower()
                     if 'xcl' in yml['ip']['simulators-supported']:
                         self.simulators_supported[common.simulators_enum.XCELIUM] = yml['ip']['simulators-supported']['xcl'].strip().lower()
                     if 'qst' in yml['ip']['simulators-supported']:
@@ -292,8 +292,8 @@ class IP:
                             self.hdl_src_flists[common.simulators_enum.VIVADO] = yml['hdl-src']['flist']['viv'].strip()
                         if 'vcs' in yml['hdl-src']['flist']:
                             self.hdl_src_flists[common.simulators_enum.VCS] = yml['hdl-src']['flist']['vcs'].strip()
-                        if 'mtr' in yml['hdl-src']['flist']:
-                            self.hdl_src_flists[common.simulators_enum.METRICS] = yml['hdl-src']['flist']['mtr'].strip()
+                        if 'mdc' in yml['hdl-src']['flist']:
+                            self.hdl_src_flists[common.simulators_enum.METRICS] = yml['hdl-src']['flist']['mdc'].strip()
                         if 'xcl' in yml['hdl-src']['flist']:
                             self.hdl_src_flists[common.simulators_enum.XCELIUM] = yml['hdl-src']['flist']['xcl'].strip()
                         if 'qst' in yml['hdl-src']['flist']:
@@ -350,13 +350,13 @@ class IP:
             self.is_encrypted      = yml['is_encrypted']
             self.is_fsoc_processed = yml['is_fsoc_processed']
             self.is_compiled  [common.simulators_enum.VIVADO ] = yml['is_compiled']['viv']
-            self.is_compiled  [common.simulators_enum.METRICS] = yml['is_compiled']['mtr']
+            self.is_compiled  [common.simulators_enum.METRICS] = yml['is_compiled']['mdc']
             self.is_compiled  [common.simulators_enum.VCS    ] = yml['is_compiled']['vcs']
             self.is_compiled  [common.simulators_enum.XCELIUM] = yml['is_compiled']['xcl']
             self.is_compiled  [common.simulators_enum.QUESTA ] = yml['is_compiled']['qst']
             self.is_compiled  [common.simulators_enum.RIVIERA] = yml['is_compiled']['riv']
             self.is_elaborated[common.simulators_enum.VIVADO ] = yml['is_elaborated']['viv']
-            self.is_elaborated[common.simulators_enum.METRICS] = yml['is_elaborated']['mtr']
+            self.is_elaborated[common.simulators_enum.METRICS] = yml['is_elaborated']['mdc']
             self.is_elaborated[common.simulators_enum.VCS    ] = yml['is_elaborated']['vcs']
             self.is_elaborated[common.simulators_enum.XCELIUM] = yml['is_elaborated']['xcl']
             self.is_elaborated[common.simulators_enum.QUESTA ] = yml['is_elaborated']['qst']
@@ -375,7 +375,7 @@ class IP:
             self.block_diagram              = yml["block_diagram"]
             self.languages                  = yml["languages"]
             self.simulators_supported[common.simulators_enum.VIVADO ] = yml['simulators_supported']['viv']
-            self.simulators_supported[common.simulators_enum.METRICS] = yml['simulators_supported']['mtr']
+            self.simulators_supported[common.simulators_enum.METRICS] = yml['simulators_supported']['mdc']
             self.simulators_supported[common.simulators_enum.VCS    ] = yml['simulators_supported']['vcs']
             self.simulators_supported[common.simulators_enum.XCELIUM] = yml['simulators_supported']['xcl']
             self.simulators_supported[common.simulators_enum.QUESTA ] = yml['simulators_supported']['qst']
@@ -394,7 +394,7 @@ class IP:
             self.hdl_src_tests_path         = yml["hdl_src_tests_path"]
             self.hdl_src_test_name_template = yml["hdl_src_test_name_template"]
             self.hdl_src_flists[common.simulators_enum.VIVADO ] = yml['hdl_src_flists']['viv']
-            self.hdl_src_flists[common.simulators_enum.METRICS] = yml['hdl_src_flists']['mtr']
+            self.hdl_src_flists[common.simulators_enum.METRICS] = yml['hdl_src_flists']['mdc']
             self.hdl_src_flists[common.simulators_enum.VCS    ] = yml['hdl_src_flists']['vcs']
             self.hdl_src_flists[common.simulators_enum.XCELIUM] = yml['hdl_src_flists']['xcl']
             self.hdl_src_flists[common.simulators_enum.QUESTA ] = yml['hdl_src_flists']['qst']
@@ -441,14 +441,14 @@ class IP:
         dict['is_fsoc_processed']           = self.is_fsoc_processed
         dict['is_compiled']                 = {}
         dict['is_compiled']['viv']          = self.is_compiled  [common.simulators_enum.VIVADO ]
-        dict['is_compiled']['mtr']          = self.is_compiled  [common.simulators_enum.METRICS]
+        dict['is_compiled']['mdc']          = self.is_compiled  [common.simulators_enum.METRICS]
         dict['is_compiled']['vcs']          = self.is_compiled  [common.simulators_enum.VCS    ]
         dict['is_compiled']['xcl']          = self.is_compiled  [common.simulators_enum.XCELIUM]
         dict['is_compiled']['qst']          = self.is_compiled  [common.simulators_enum.QUESTA ]
         dict['is_compiled']['riv']          = self.is_compiled  [common.simulators_enum.RIVIERA]
         dict['is_elaborated']               = {}
         dict['is_elaborated']['viv']        = self.is_elaborated[common.simulators_enum.VIVADO ]
-        dict['is_elaborated']['mtr']        = self.is_elaborated[common.simulators_enum.METRICS]
+        dict['is_elaborated']['mdc']        = self.is_elaborated[common.simulators_enum.METRICS]
         dict['is_elaborated']['vcs']        = self.is_elaborated[common.simulators_enum.VCS    ]
         dict['is_elaborated']['xcl']        = self.is_elaborated[common.simulators_enum.XCELIUM]
         dict['is_elaborated']['qst']        = self.is_elaborated[common.simulators_enum.QUESTA ]
@@ -468,7 +468,7 @@ class IP:
         dict['languages']                   = self.languages
         dict['simulators_supported']        = {}
         dict['simulators_supported']['viv'] = self.simulators_supported[common.simulators_enum.VIVADO ]
-        dict['simulators_supported']['mtr'] = self.simulators_supported[common.simulators_enum.METRICS]
+        dict['simulators_supported']['mdc'] = self.simulators_supported[common.simulators_enum.METRICS]
         dict['simulators_supported']['vcs'] = self.simulators_supported[common.simulators_enum.VCS    ]
         dict['simulators_supported']['xcl'] = self.simulators_supported[common.simulators_enum.XCELIUM]
         dict['simulators_supported']['qst'] = self.simulators_supported[common.simulators_enum.QUESTA ]
@@ -488,7 +488,7 @@ class IP:
         dict['hdl_src_test_name_template'] = self.hdl_src_test_name_template
         dict['hdl_src_flists']             = {}
         dict['hdl_src_flists']['viv']      = self.hdl_src_flists[common.simulators_enum.VIVADO ]
-        dict['hdl_src_flists']['mtr']      = self.hdl_src_flists[common.simulators_enum.METRICS]
+        dict['hdl_src_flists']['mdc']      = self.hdl_src_flists[common.simulators_enum.METRICS]
         dict['hdl_src_flists']['vcs']      = self.hdl_src_flists[common.simulators_enum.VCS    ]
         dict['hdl_src_flists']['xcl']      = self.hdl_src_flists[common.simulators_enum.XCELIUM]
         dict['hdl_src_flists']['qst']      = self.hdl_src_flists[common.simulators_enum.QUESTA ]

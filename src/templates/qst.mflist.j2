@@ -8,9 +8,10 @@
 {% else %}+define+{{ define.name }}={{ define.value }}{% endif %}{% endfor %}
 
 
-// Directories{% for dir in dirs %}
-+incdir+{{ dir }}{% endfor %}
+// UVM
++incdir+$(MIO_UVM_HOME)/src
+$(MIO_UVM_HOME)/src/uvm_pkg.sv
 
 
-// Files{% for file in files %}
-{{ file }}{% endfor %}
+// Filelists{% for filelist in filelists %}
+-f {{ filelist }}{% endfor %}

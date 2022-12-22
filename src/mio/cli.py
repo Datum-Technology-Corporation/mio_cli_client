@@ -35,7 +35,7 @@ import pathlib
 
 
 uvm_levels      = ["none","low","medium","high","debug"]
-simulators      = ["viv","mtr","vcs","xcl","qst","riv"]
+simulators      = ["viv","mdc","vcs","xcl","qst","riv"]
 commands        = ["clean", "cov", "doctor", "dox", "init" ,"install", "login", "new", "package", "publish", "regr", "results", "sim", "!"]
 repeat_commands = ["sim"]
 
@@ -197,7 +197,7 @@ def build_parser():
     parser_sim.add_argument('-s', "--seed"     , help='Specify the seed for constrained-random testing.  If none is provided, a random one will be picked.', type=int           , required=False)
     parser_sim.add_argument('-v', "--verbosity", help='Specify the UVM verbosity level for logging: none, low, medium, high or debug.  Default: medium'    , choices=uvm_levels , required=False)
     parser_sim.add_argument('-e', "--errors"   , help='Specifies the number of errors at which compilation/elaboration/simulation is terminated.'          , type=int           , required=False)
-    parser_sim.add_argument('-a', "--app"      , help='Specifies which simulator to use: viv, mtr, vcs, xcl, qst, riv.'                                    , choices=simulators , required=False)
+    parser_sim.add_argument('-a', "--app"      , help='Specifies which simulator to use: viv, mdc, vcs, xcl, qst, riv.'                                    , choices=simulators , required=False)
     parser_sim.add_argument('-w', "--waves"    , help='Enable wave capture to disk.'                                                                       , action="store_true", required=False)
     parser_sim.add_argument('-c', "--cov"      , help='Enable code & functional coverage capture.'                                                         , action="store_true", required=False)
     parser_sim.add_argument('-g', "--gui"      , help="Invoke the simulator's Graphical User Interface."                                                   , action="store_true", required=False)
@@ -215,7 +215,7 @@ def build_parser():
     parser_sim = subparsers.add_parser('regr', help=help_text.regr_help_text, add_help=False)
     parser_sim.add_argument('ip'         , help='Target IP')
     parser_sim.add_argument('regr'       , help='Regression to be run.  For Test Bench IPs with multiple Test Suites, the suite must be specified. Ex: `mio regr my_ip apbxc.sanity`')
-    parser_sim.add_argument('-a', "--app", help='Specifies which simulator to use: viv, mtr, vcs, xcl, qst, riv.', choices=simulators , required=False)
+    parser_sim.add_argument('-a', "--app", help='Specifies which simulator to use: viv, mdc, vcs, xcl, qst, riv.', choices=simulators , required=False)
     parser_sim.add_argument('-d', "--dry", help='Compiles and elaborates target IP but only prints out the tests that would be run.', action="store_true", default=False , required=False)
     
     parser_clean = subparsers.add_parser('clean', help=help_text.clean_help_text, add_help=False)
@@ -243,7 +243,7 @@ def create_sim_job(cli_args):
         cli_args.app = cli_args.app.lower()
         if cli_args.app == "viv":
             sim_job.simulator = common.simulators_enum.VIVADO
-        elif cli_args.app == "mtr":
+        elif cli_args.app == "mdc":
             sim_job.simulator = common.simulators_enum.METRICS
         elif cli_args.app == "vcs":
             sim_job.simulator = common.simulators_enum.VCS
@@ -266,6 +266,7 @@ def create_sim_job(cli_args):
         sim_job.elaborate = True
         sim_job.simulate  = True
     else:
+        sim_job.one_shot = False
         if cli_args.C:
             sim_job.compile = True
         else:
@@ -278,6 +279,9 @@ def create_sim_job(cli_args):
             sim_job.simulate = True
         else:
             sim_job.simulate = False
+    
+    if sim_job.simulator == common.simulators_enum.VIVADO:
+        sim_job.one_shot = False
     
     if cli_args.seed == None:
         sim_job.seed = random.randint(1, 2147483646)

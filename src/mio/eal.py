@@ -35,8 +35,15 @@ riviera_default_compilation_args = []
 vivado_project_default_vlog_compilation_args = ["--relax"]
 vivado_project_default_vhdl_compilation_args = ["--relax"]
 
-vivado_default_elaboration_args  = ["--incr", "-relax", "--O0", "-v 0", "-timescale 1ns/1ps", "-dup_entity_as_module"]
-metrics_default_elaboration_args = ["+acc+b"]
+vivado_default_gen_image_args  = ["--incr", "-sv", "-relax", "--O0", "-v 0", "-timescale 1ns/1ps", "-dup_entity_as_module"]
+metrics_default_gen_image_args = ["+acc+b", "-suppress MultiBlockWrite:ReadingOutputModport:UndefinedMacro:DupModuleDefn"]
+vcs_default_gen_image_args     = ["-lca", "-sverilog"]
+xcelium_default_gen_image_args = []
+questa_default_gen_image_args  = ["-64", "-incrcomp"]
+riviera_default_gen_image_args = []
+
+vivado_default_elaboration_args  = ["--incr", "-relax", "--O0", "-v 0", "-dup_entity_as_module"]
+metrics_default_elaboration_args = ["+acc+b", "-suppress DupModuleDefn"]
 vcs_default_elaboration_args     = []
 xcelium_default_elaboration_args = []
 questa_default_elaboration_args  = ["-64"]
@@ -77,6 +84,20 @@ xcelium_elab_log_warning_regexes = ["*W "]
 questa_elab_log_warning_regexes  = ["\*\* Warning:"]
 riviera_elab_log_warning_regexes = ["Warning:"]
 
+vivado_gen_image_log_error_regexes  = ["ERROR:", "CRITICAL WARNING:"]
+metrics_gen_image_log_error_regexes = ["=E:", "=F:", "error:"]
+vcs_gen_image_log_error_regexes     = ["Error-"]
+xcelium_gen_image_log_error_regexes = ["*E "]
+questa_gen_image_log_error_regexes  = ["\*\* Error:"]
+riviera_gen_image_log_error_regexes = ["Error:"]
+
+vivado_gen_image_log_warning_regexes  = ["WARNING:"]
+metrics_gen_image_log_warning_regexes = ["=W:"]
+vcs_gen_image_log_warning_regexes     = ["Warning-"]
+xcelium_gen_image_log_warning_regexes = ["*W "]
+questa_gen_image_log_warning_regexes  = ["\*\* Warning:"]
+riviera_gen_image_log_warning_regexes = ["Warning:"]
+
 sem = BoundedSemaphore(1)
 
 
@@ -100,6 +121,69 @@ def compile_fsoc_core(flist_path, core, sim_job):
             common.fatal("Stopping due to compilation.")
         log_cmp_history_fsoc(core, log_file_path, sim_job, timestamp_start, timestamp_end)
     return log_file_path
+
+
+def gen_ip_image(ip, sim_job, fsoc_core_name, fsoc_core_flist_path):
+    ip_str = f"{ip.vendor}/{ip.name}"
+    ip_dir = f"{ip.vendor}__{ip.name}"
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
+    deps_list  = get_dep_list(ip, sim_job)
+    flist_path = gen_master_flist(ip, sim_job, deps_list, fsoc_core_name, fsoc_core_flist_path)
+    
+    for dep in deps_list:
+        prep_ip_for_gen_image(dep, sim_job)
+    prep_ip_for_gen_image(ip, sim_job)
+    
+    timestamp_start = common.timestamp()
+    log_file_path = gen_image_flist(ip, ip.vendor, ip.name, flist_path, sim_job, ip.is_local)
+    if not sim_job.dry_run:
+        timestamp_end = common.timestamp()
+        errors = scan_gen_image_log_file_for_errors(log_file_path, sim_job)
+        if len(errors):
+            common.error("Errors during compilation/elaboration of IP '" + ip_str + "':")
+            for error in errors:
+                common.error("  " + error)
+            sim.kill_progress_bar()
+            common.fatal("Stopping due to compilation/elaborationn errors. Full log: " + log_file_path)
+        log_gen_image_history_ip(ip, log_file_path, sim_job, timestamp_start, timestamp_end)
+        ip.is_compiled  [sim_job.simulator] = True
+        ip.is_elaborated[sim_job.simulator] = True
+    return log_file_path
+
+
+def prep_ip_for_gen_image(ip, sim_job):
+    ip_str = f"{ip.vendor}/{ip.name}"
+    ip_dir = f"{ip.vendor}__{ip.name}"
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
+    if sim_job.bwrap:
+        if ip.is_global:
+            if ip.is_encrypted:
+                common.copy_directory(ip.path + "/" + ip.src_path + "." + sim_str, f"{cfg.temp_path}/{ip_dir}")
+            else:
+                common.copy_directory(ip.path + "/" + ip.src_path, f"{cfg.temp_path}/{ip_dir}")
+            path = "${PROJECT_ROOT_DIR}/.mio/temp/" + ip_dir
+        else:
+            if ip.is_encrypted:
+                path = "${PROJECT_ROOT_DIR}/" + os.path.relpath(ip.path + "/" + ip.src_path + "." + sim_str, cfg.project_dir)
+            else:
+                path = "${PROJECT_ROOT_DIR}/" + os.path.relpath(ip.path + "/" + ip.src_path, cfg.project_dir)
+    elif ip.is_global and (sim_job.simulator == common.simulators_enum.METRICS):
+        if ip.is_encrypted:
+            common.copy_directory(ip.path + "/" + ip.src_path + "." + sim_str, f"{cfg.temp_path}/{ip_dir}")
+            path = ".mio/temp/" + ip_dir
+        else:
+            common.copy_directory(ip.path + "/" + ip.src_path, f"{cfg.temp_path}/{ip_dir}")
+            path = ".mio/temp/" + ip_dir
+    else:
+        if ip.is_encrypted:
+            path = ip.path + "/" + ip.src_path + "." + sim_str
+        else:
+            path = ip.path + "/" + ip.src_path
+    
+    flist_env_var_name = 'MIO_' + ip.name.upper() + '_SRC_PATH'
+    os.environ[flist_env_var_name] = path
+    sim_job.bwrap_flists[flist_env_var_name] = path
+
 
 
 def compile_ip(ip, sim_job):
@@ -188,12 +272,12 @@ def elaborate(ip, sim_job):
     defines = sim_job.cmp_args
     if sim_job.is_regression:
         ip_dir_name = f"{ip.vendor}__{ip.name}__{sim_job.regression_name}"
-        common.create_dir(cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name)
-        common.create_dir(cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name + "/" + sim_job.regression_timestamp)
-        elab_out =        cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name + "/" + sim_job.regression_timestamp
+        common.create_dir(cfg.sim_output_dir + "/" + sim_str + "/regr_wd/" + ip_dir_name)
+        common.create_dir(cfg.sim_output_dir + "/" + sim_str + "/regr_wd/" + ip_dir_name + "/" + sim_job.regression_timestamp)
+        elab_out =        cfg.sim_output_dir + "/" + sim_str + "/regr_wd/" + ip_dir_name + "/" + sim_job.regression_timestamp
     else:
         ip_dir_name = f"{ip.vendor}__{ip.name}"
-        elab_out = cfg.sim_output_dir + "/" + sim_str + "/elab_out/single_sim/" + ip_dir_name
+        elab_out = cfg.sim_output_dir + "/" + sim_str + "/sim_wd"
     common.create_dir(elab_out)
     timestamp_start = common.timestamp()
     log_file_path = do_elaborate(ip, sim_job, elab_out)
@@ -221,14 +305,10 @@ def simulate(ip, sim_job):
     log_sim_start_history(ip, sim_job, start)
     if sim_job.is_regression:
         ip_dir_name = f"{ip.vendor}__{ip.name}__{sim_job.regression_name}"
-        regr_sim_out_path = cfg.sim_output_dir + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name + "/" + sim_job.regression_timestamp
-        common.create_dir(regr_sim_out_path)
-        sim_out = regr_sim_out_path + "/" + sim_str + "/elab_out/regressions/" + ip_dir_name + "/" + sim_job.regression_timestamp
-        common.create_dir(sim_out)
+        sim_out = cfg.sim_output_dir + "/" + sim_str + "/regr_wd/" + ip_dir_name + "/" + sim_job.regression_timestamp
     else:
         ip_dir_name = f"{ip.vendor}__{ip.name}"
-        sim_out = cfg.sim_output_dir + "/" + sim_str + "/elab_out/single_sim/" + ip_dir_name
-        common.create_dir(sim_out)
+        sim_out = cfg.sim_output_dir + "/" + sim_str + "/sim_wd"
     do_simulate(ip, sim_job, sim_out)
     if not sim_job.dry_run:
         sem.acquire()
@@ -251,6 +331,117 @@ def init_metrics_workspace():
             common.fatal(f"Failed to initialize Metrics Cloud Simulator workspace")
 
 
+def gen_image_flist(ip, vendor, name, flist_path, sim_job, local):
+    defines = sim_job.cmp_args
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
+    arg_list = []
+    cmp_args_list = convert_compilation_args(sim_job)
+    
+    ip_dir_name = f"{vendor}__{name}"
+    ip_regr_root_path = cfg.sim_output_dir + "/" + sim_str + "/regr_wd/" + ip_dir_name + "__" + sim_job.regression_name + "/"
+    if sim_job.is_regression:
+        cmp_out = ip_regr_root_path + sim_job.regression_timestamp
+    else:
+        cmp_out = cfg.sim_output_dir + "/" + sim_str + "/sim_wd"
+    
+    if sim_job.simulator != common.simulators_enum.METRICS:
+        if sim_job.is_regression:
+            common.create_dir(ip_regr_root_path)
+        common.create_dir(cmp_out)
+    
+    compilation_log_path = cfg.sim_dir + "/cmp/" + ip_dir_name + "." + sim_str + ".log"
+    compilation_command_file = f"{ip_dir_name}.{sim_str}.gen_image.cmd.txt"
+    
+    if sim_job.simulator == common.simulators_enum.VIVADO:
+        # Not yet supported for vivado
+        # 1) Finish assembly of prj file
+        # 2) Parse user vivado flists OR drop them for vivado entirely
+        arg_list.append("-prj " + flist_path)
+        arg_list += vivado_default_gen_image_args
+        arg_list += cmp_args_list
+        arg_list.append("-L uvm")
+        arg_list.append(f"-s {ip_dir_name}")
+        arg_list.append("--log "  + compilation_log_path)
+        write_cmd_to_disk(sim_job, "xelab", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vivado_home + "/xelab", arg_list, wd=cmp_out, output=cfg.dbg, dry_run=sim_job.dry_run)
+        
+    elif sim_job.simulator == common.simulators_enum.VCS:
+        arg_list += vcs_default_gen_image_args
+        arg_list.append(license_macros_file_path);
+        arg_list.append("-f " + flist_path)
+        arg_list += cmp_args_list
+        arg_list += deps_list
+        arg_list.append("-l "  + compilation_log_path)
+        write_cmd_to_disk(sim_job, "vcs", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.vcs_home + "/vcs", arg_list, wd=cmp_out, output=cfg.dbg, dry_run=sim_job.dry_run)
+        
+    elif sim_job.simulator == common.simulators_enum.METRICS:
+        arg_list += metrics_default_gen_image_args
+        arg_list.append("-F " + flist_path)
+        mtr_compilation_log_path = ip_dir_name + "." + sim_str + ".log"
+        arg_list.append("-l " + mtr_compilation_log_path)
+        arg_list.append(f"-timescale {cfg.sim_timescale}")
+        
+        if ip.vendor == "@global":
+            arg_list.append(f"-genimage global__{ip.name}")
+        elif ip.vendor == "@fsoc":
+            arg_list.append(f"-genimage fsoc__{ip.name}")
+        else:
+            arg_list.append(f"-genimage {ip.vendor}__{ip.name}")
+        
+        for construct in ip.hdl_src_top_constructs:
+            if "." in construct:
+                lib,name = construct.split(".")
+                arg_list.append(f"-top {name}")
+            else:
+                arg_list.append(f"-top {construct}")
+        
+        arg_list_str = ""
+        for arg in arg_list:
+            arg_list_str = arg_list_str + f" {arg}"
+        if cfg.dbg:
+            arg_list = [f"dsim -v -a '{arg_list_str}'"]
+        else:
+            arg_list = [f"dsim -a '{arg_list_str}'"]
+        write_cmd_to_disk(sim_job, "mdc", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, wd=cfg.project_dir, output=cfg.dbg, dry_run=sim_job.dry_run)
+        launch_eda_bin(cfg.metrics_home + "/mdc", ["download", mtr_compilation_log_path], wd=cfg.project_dir, output=cfg.dbg, dry_run=sim_job.dry_run)
+        if not sim_job.dry_run:
+            common.move_file(f"{cfg.project_dir}/_downloaded_{mtr_compilation_log_path}", compilation_log_path)
+        
+    elif sim_job.simulator == common.simulators_enum.XCELIUM:
+        arg_list += xcelium_default_gen_image_args
+        arg_list.append(license_macros_file_path);
+        arg_list.append("-f " + flist_path)
+        # TODO Add compilation output argument for nc
+        write_cmd_to_disk(sim_job, "xrun", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.nc_home + "/xrun", arg_list, wd=cmp_out, output=cfg.dbg, dry_run=sim_job.dry_run)
+        
+    elif sim_job.simulator == common.simulators_enum.QUESTA:
+        os.environ['MIO_UVM_HOME'] = f"$MIO_QUESTA_HOME/../verilog_src/uvm-{cfg.uvm_version}"
+        arg_list += questa_default_gen_image_args
+        arg_list.append(license_macros_file_path);
+        arg_list.append("-f " + flist_path)
+        arg_list += cmp_args_list
+        arg_list += deps_list
+        arg_list.append(f"-Ldir {cmp_out_dir}")
+        arg_list.append("-l "  + compilation_log_path)
+        arg_list.append(f"-work {name}")
+        write_cmd_to_disk(sim_job, "vlog", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.questa_home + "/vlog", arg_list, wd=cmp_out, output=cfg.dbg)
+        
+    elif sim_job.simulator == common.simulators_enum.RIVIERA:
+        arg_list += riviera_default_gen_image_args
+        arg_list.append(license_macros_file_path);
+        arg_list.append("-f " + flist_path)
+        # TODO Add compilation output argument for riviera
+        write_cmd_to_disk(sim_job, "vlog", arg_list, compilation_command_file)
+        sim_job.bwrap_commands += launch_eda_bin(cfg.riviera_home + "/vlog", arg_list, wd=cmp_out, output=cfg.dbg, dry_run=sim_job.dry_run)
+    
+    return compilation_log_path
+
+
+
 def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True):
     defines = sim_job.cmp_args
     sim_str = common.get_simulator_short_name(sim_job.simulator)
@@ -267,9 +458,12 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
     ip_dir_name = f"{vendor}__{name}"
     cmp_out_dir = cfg.sim_output_dir + "/" + sim_str + "/cmp_out/"
     cmp_out = cmp_out_dir + ip_dir_name
-    sim_out = cfg.sim_output_dir + "/" + sim_str + "/cmp_wd/" + ip_dir_name
-    common.create_dir(cmp_out)
-    common.create_dir(sim_out)
+    sim_out = cfg.sim_output_dir + "/" + sim_str + "/sim_wd"
+    
+    if sim_job.simulator != common.simulators_enum.METRICS:
+        common.create_dir(cmp_out)
+        common.create_dir(sim_out)
+    
     compilation_log_path = cfg.sim_dir + "/cmp/" + ip_dir_name + "." + sim_str + ".cmp.log"
     compilation_command_file = f"{ip_dir_name}.{sim_str}.cmp.cmd.txt"
     
@@ -280,6 +474,7 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list.append("-f " + flist_path)
         arg_list += cmp_args_list
         arg_list.append("-L uvm")
+        arg_list.append(f"--uvm_version {cfg.uvm_version}")
         arg_list += deps_list
         arg_list.append(f"--work {name}={cmp_out}")
         arg_list.append("--log "  + compilation_log_path)
@@ -416,6 +611,7 @@ def do_elaborate(ip, sim_job, wd):
         arg_list += elab_list
         arg_list += deps_list
         arg_list += vivado_default_elaboration_args
+        arg_list.append(f"-timescale {cfg.sim_timescale}")
         arg_list.append("--log "  + elaboration_log_path)
         arg_list.append("-s "     + ip.name)
         arg_list.append("-L "     + ip.name + "=" + ip_cmp_path)
@@ -814,7 +1010,7 @@ def dut_elab_to_arg_list(ip, sim_job):
     return args
 
 
-def get_ip_flist_path(ip, sim_job):
+def get_ip_flist_path(ip, sim_job, include_uvm=True):
     ip_str = f"{ip.vendor}/{ip.name}"
     ip_dir = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
@@ -831,40 +1027,74 @@ def get_ip_flist_path(ip, sim_job):
             else:
                 flist_path = f"{ip.path}/{ip.src_path}/{ip.hdl_src_flists[sim_job.simulator]}"
     if not found_flist:
-        flist_path = gen_flist(ip, sim_job)
+        flist_path = gen_flist(ip, sim_job, include_uvm)
     return flist_path
 
 
-def gen_master_flist(ip, sim_job, deps):
+def gen_master_flist(ip, sim_job, deps, fsoc_core_name, fsoc_core_flist_path):
     sim_str = common.get_simulator_short_name(sim_job.simulator)
-    flists = gen_flists(ip, deps, sim_job)
-    flist_path = cfg.temp_path + "/" + ip.vendor + "__" + ip.name + ".top." + sim_str + ".flist"
     
-    if sim_job.simulator == common.simulators_enum.METRICS:
-        final_flists = []
-        for flist in flists:
-            final_flist = os.path.relpath(flist, cfg.temp_path)
-            final_flists.append(final_flist)
-        flists = final_flists
-    
-    gen_flist_file(sim_job.simulator, ip.vendor, ip.name, flist_path, [], flists, [], [])
-    
-    if sim_job.simulator == common.simulators_enum.METRICS:
-        flist_path = os.path.relpath(flist_path, cfg.project_dir)
-        flist_path = flist_path.replace(cfg.project_dir, "")
+    if sim_job.simulator == common.simulators_enum.VIVADO:
+        flist_path = cfg.temp_path + "/" + ip.vendor + "__" + ip.name + ".prj"
+        gen_prj_file(sim_job, ip, flist_path)
+    else:
+        flists = gen_flists(ip, deps, sim_job, False)
+        flist_path = cfg.temp_path + "/" + ip.vendor + "__" + ip.name + ".top." + sim_str + ".flist"
+        if sim_job.simulator == common.simulators_enum.METRICS:
+            final_flists = []
+            if fsoc_core_flist_path != "":
+                final_flists.append(fsoc_core_flist_path.replace(".mio/temp/", ""))
+            for flist in flists:
+                final_flist = os.path.relpath(flist, cfg.temp_path)
+                final_flists.append(final_flist)
+            flists = final_flists
+        gen_mflist_file(sim_job.simulator, ip.vendor, ip.name, flist_path, [], flists)
+        if sim_job.simulator == common.simulators_enum.METRICS:
+            flist_path = os.path.relpath(flist_path, cfg.project_dir)
+            #flist_path = flist_path.replace(cfg.project_dir, "")
     
     return flist_path
 
 
-def gen_flists(ip, deps, sim_job):
+def gen_prj_file(sim_job, ip, flist_path):
+    ip_str = f"{ip_vendor}/{ip_name}"
+    ip_dir = f"{ip.vendor}__{ip.name}"
+    sim_str = common.get_simulator_short_name(simulator)
+    try:
+        flist_template = cfg.templateEnv.get_template(f"viv.prj.j2")
+        common.dbg(f"Generating Vivado Project file for IP '{ip_str}'")
+        outputText = flist_template.render(target=ip_dir, defines=defines, filelists=filelists)
+        with open(path,'w') as flist_file:
+            flist_file.write(outputText)
+            flist_file.close()
+    except Exception as e:
+        common.fatal(f"Failed to create Vivado Project file for IP '{ip_str}': {e}")
+
+
+def gen_mflist_file(simulator, ip_vendor, ip_name, path, defines, filelists):
+    ip_str = f"{ip_vendor}/{ip_name}"
+    sim_str = common.get_simulator_short_name(simulator)
+    
+    try:
+        flist_template = cfg.templateEnv.get_template(f"{sim_str}.mflist.j2")
+        common.dbg(f"Generating master filelist for IP '{ip_str}' and simulator '{sim_str}' with filelists='{filelists}'")
+        outputText = flist_template.render(defines=defines, filelists=filelists)
+        with open(path,'w') as flist_file:
+            flist_file.write(outputText)
+            flist_file.close()
+    except Exception as e:
+        common.fatal(f"Failed to create master filelist for IP '{ip_str}': {e}")
+
+
+def gen_flists(ip, deps, sim_job, include_uvm=True):
     flists = []
     for dep in deps:
-        flists.append(get_ip_flist_path(dep, sim_job))
-    flists.append(get_ip_flist_path(ip, sim_job))
+        flists.append(get_ip_flist_path(dep, sim_job, include_uvm))
+    flists.append(get_ip_flist_path(ip, sim_job, include_uvm))
     return flists
 
 
-def gen_flist(ip, sim_job):
+def gen_flist(ip, sim_job, include_uvm=True):
     ip_str = f"{ip.vendor}/{ip.name}"
     ip_dir = f"{ip.vendor}__{ip.name}"
     sim_str = common.get_simulator_short_name(sim_job.simulator)
@@ -917,10 +1147,11 @@ def gen_flist(ip, sim_job):
             top_files.append("${MIO_" + ip.name.upper() + "_SRC_PATH}/" + file)
     
     flist_path = cfg.temp_path + "/" + ip.vendor + "__" + ip.name + "." + simulator + ".flist"
-    if ip.type == "dv":
-        include_uvm = True
-    else:
-        include_uvm = False
+    if include_uvm:
+        if ip.type == "dv":
+            include_uvm = True
+        else:
+            include_uvm = False
     gen_flist_file(sim_job.simulator, ip.vendor, ip.name, flist_path, defines, [], directories, top_files, include_uvm)
     common.dbg(f"Using filelist '{flist_path}' for IP '{ip_str}'")
     
@@ -929,6 +1160,7 @@ def gen_flist(ip, sim_job):
 
 def gen_flist_file(simulator, ip_vendor, ip_name, path, defines, filelists, directories, files, include_uvm):
     ip_str = f"{ip_vendor}/{ip_name}"
+    ip_dir = f"{ip_vendor}__{ip_name}"
     sim_str = common.get_simulator_short_name(simulator)
     
     if include_uvm:
@@ -942,7 +1174,7 @@ def gen_flist_file(simulator, ip_vendor, ip_name, path, defines, filelists, dire
     try:
         flist_template = cfg.templateEnv.get_template(f"{sim_str}.flist.j2")
         common.dbg(f"Generating filelist for IP '{ip_str}' and simulator '{sim_str}' with files='{files}' and dirs='{directories}'")
-        outputText = flist_template.render(defines=defines, filelists=filelists, files=files, dirs=directories)
+        outputText = flist_template.render(target=ip_dir, defines=defines, filelists=filelists, files=files, dirs=directories)
         with open(path,'w') as flist_file:
             flist_file.write(outputText)
             flist_file.close()
@@ -1193,7 +1425,7 @@ def encrypt_tree(ip_name, location, app):
         except Exception as e:
             common.fatal(f"Failed to write encryption script to disk: {e}")
         launch_eda_bin(cfg.vivado_home + "/vivado", [f"-mode batch", f" -source {tcl_script_path}"], cfg.temp_path, cfg.dbg)
-    elif app == "mtr":
+    elif app == "mdc":
         if not os.path.exists(cfg.encryption_key_path_metrics):
             common.fatal(f"Could not find metrics encryption key at '{cfg.encryption_key_path_metrics}'")
         mtr_key_local_path = f"{cfg.temp_path}/metrics.key"
@@ -1314,6 +1546,32 @@ def scan_elab_log_file_for_errors(log_file_path, sim_job):
     return errors
 
 
+def scan_gen_image_log_file_for_errors(log_file_path, sim_job):
+    common.dbg("Scanning compilation/elaborationn log file " + log_file_path + " for errors")
+    errors = []
+    if sim_job.simulator == common.simulators_enum.VIVADO:
+        regexes = vivado_gen_image_log_error_regexes
+    elif sim_job.simulator == common.simulators_enum.VCS:
+        regexes = vcs_gen_image_log_error_regexes
+    elif sim_job.simulator == common.simulators_enum.METRICS:
+        regexes = metrics_gen_image_log_error_regexes
+    elif sim_job.simulator == common.simulators_enum.XCELIUM:
+        regexes = xcelium_gen_image_log_error_regexes
+    elif sim_job.simulator == common.simulators_enum.QUESTA:
+        regexes = questa_gen_image_log_error_regexes
+    elif sim_job.simulator == common.simulators_enum.RIVIERA:
+        regexes = riviera_gen_image_log_error_regexes
+    try:
+        for i, line in enumerate(open(log_file_path)):
+            for regex in regexes:
+                matches = re.search(regex, line)
+                if matches:
+                    errors.append(line.replace("\n", ""))
+    except Exception as e:
+        common.fatal("Failed while parsing compilation/elaboration log file " + log_file_path + ": " + str(e))
+    return errors
+
+
 def log_cmp_history_fsoc(core, log_path, sim_job, timestamp_start, timestamp_end):
     sim_str = common.get_simulator_short_name(sim_job.simulator)
     common.dbg("Updating history with FuseSoC core '" + core.name + "' compilation")
@@ -1371,6 +1629,25 @@ def log_elab_history(ip, log_path, sim_job, timestamp_start, timestamp_end):
     if 'elaboration' not in cfg.job_history[ip_str]:
         cfg.job_history[ip_str]['elaboration'] = []
     cfg.job_history[ip_str]['elaboration'].append({
+        "simulator"            : sim_str,
+        'timestamp_start'      : timestamp_start,
+        'timestamp_end'        : timestamp_end,
+        'log_path'             : log_path,
+        "is_regression"        : sim_job.is_regression,
+        "regression_name"      : sim_job.regression_name,
+        "regression_timestamp" : sim_job.regression_timestamp
+    })
+
+
+def log_gen_image_history_ip(ip, log_path, sim_job, timestamp_start, timestamp_end):
+    ip_str = f"{ip.vendor}/{ip.name}"
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
+    common.dbg("Updating history with IP '" + ip_str + "' compilation/elaboration")
+    if ip_str not in cfg.job_history:
+        cfg.job_history[ip_str] = {}
+    if 'gen-image' not in cfg.job_history[ip_str]:
+        cfg.job_history[ip_str]['gen-image'] = []
+    cfg.job_history[ip_str]['gen-image'].append({
         "simulator"            : sim_str,
         'timestamp_start'      : timestamp_start,
         'timestamp_end'        : timestamp_end,

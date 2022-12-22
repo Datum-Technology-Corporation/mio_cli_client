@@ -27,7 +27,7 @@ from distutils.dir_util import remove_tree
 
 class simulators_enum(Enum):
     VIVADO  = "viv"
-    METRICS = "mtr"
+    METRICS = "mdc"
     VCS     = "vcs"
     XCELIUM = "xcl"
     QUESTA  = "qst"
@@ -84,7 +84,7 @@ def get_simulator_short_name(simulator):
     elif simulator == simulators_enum.VCS:
         return "vcs"
     elif simulator == simulators_enum.METRICS:
-        return "mtr"
+        return "mdc"
     elif simulator == simulators_enum.XCELIUM:
         return "xcl"
     elif simulator == simulators_enum.QUESTA:

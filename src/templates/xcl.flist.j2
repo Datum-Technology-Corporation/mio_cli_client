@@ -3,13 +3,10 @@
 //
 
 
-// Filelists{% for filelist in filelists %}
--f {{ filelist }}{% endfor %}
-
-
 // Defines{% for define in defines %}
 {% if define.boolean %}+define+{{ define.name }}
 {% else %}+define+{{ define.name }}={{ define.value }}{% endif %}{% endfor %}
+
 
 // Directories{% for dir in dirs %}
 +incdir+{{ dir }}{% endfor %}
@@ -17,4 +14,3 @@
 
 // Files{% for file in files %}
 {{ file }}{% endfor %}
-

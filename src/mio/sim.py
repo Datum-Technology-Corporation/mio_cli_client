@@ -36,7 +36,7 @@ import tarfile
 
 bwrap_ignore_list = [
     "xsim.dir", ".str", ".Xil", ".jou", ".log", ".wdb", ".vcd", ".log", ".sdb", ".rlx", ".pb", ".o", ".png", ".jpg",
-    ".svg", ".vsdx", ".docx", ".xlsx", ".pptx", ".md"
+    ".svg", ".vsdx", ".docx", ".xlsx", ".pptx", ".md", "sync", "workspace"
 ]
 
 bwrap_ignore_dirs = [ ".git", ".svn" ]
@@ -73,6 +73,7 @@ class SimulationJob:
     def __init__(self, ip_str):
         self.vendor, self.ip = common.parse_dep(ip_str)
         self.simulator       = ""
+        self.one_shot        = True
         self.fsoc            = False
         self.compile         = False
         self.elaborate       = False
@@ -160,16 +161,71 @@ def main(sim_job):
     create_sim_directories()
     
     check_dependencies(ip)
-    cmp_ip_count = 0
     ip.update_is_compiled_elaborated(sim_job.simulator)
+    
+    if sim_job.one_shot:
+        one_step_sim(sim_job)
+    else:
+        multi_step_sim(sim_job)
+    
+    if sim_job.bwrap:
+        bubble_wrap(sim_job)
+
+
+def one_step_sim(sim_job):
+    global est_time
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
+    if sim_job.vendor == "":
+        ip = cache.get_anon_ip(sim_job.ip, True)
+    else:
+        ip = cache.get_ip(sim_job.vendor, sim_job.ip, True)
+    if ip == None:
+        common.fatal(f"Cannot find IP '{sim_job.vendor}/{sim_job.ip}'")
+    ip_str = f"{ip.vendor}/{ip.name}"
+    flist_path = ""
+    fsoc_core_name = ""
+    if ip.dut_ip_type == "fsoc":
+        if not ip.dut_core.is_installed:
+            flist_path = eal.invoke_fsoc(ip, ip.dut_core, sim_job)
+            ip.dut_core.is_installed = True
+            fsoc_core_name = ip.dut_core
+        else:
+            common.info("Skipping processing of DUT FuseSoC core '" + ip.dut_fsoc_full_name + "'.")
+    else:
+        if ip.dut != None:
+            if ip.dut.target_ip_model == None:
+                common.fatal(f"Did not resolve DUT dependency ('{ip.dut.vendor}/{ip.dut.target_ip}')!")
+            if ip.dut.target_ip_model.sub_type == "vivado":
+                common.fatal("Vivado Project DUTs are not yet amenable to single-step compilation/elaboration flow.")
+    
+    common.info(f"Compiling+Elaborating {ip_str} ...")
+    eal.gen_ip_image(ip, sim_job, fsoc_core_name, flist_path)
+    if not sim_job.is_regression:
+        common.banner(f"Simulating {ip_str} ...")
+        eal.simulate(ip, sim_job)
+        print_end_of_simulation_message(ip, sim_job)
+
+
+def multi_step_sim(sim_job):
+    global est_time
+    sim_str = common.get_simulator_short_name(sim_job.simulator)
+    if sim_job.vendor == "":
+        ip = cache.get_anon_ip(sim_job.ip, True)
+    else:
+        ip = cache.get_ip(sim_job.vendor, sim_job.ip, True)
+    if ip == None:
+        common.fatal(f"Cannot find IP '{sim_job.vendor}/{sim_job.ip}'")
+    ip_str = f"{ip.vendor}/{ip.name}"
+    
+    cmp_ip_count = 0
     if sim_job.compile:
         if ip.has_dut:
-            compile_dut = False
+            compile_dut = True
             if ip.dut_ip_type == "fsoc":
-                compile_dut = ip.dut_core.is_compiled[sim_job.simulator]
+                compile_dut = True #ip.dut_core.is_compiled[sim_job.simulator]
             else:
-                compile_dut = ip.is_compiled[sim_job.simulator]
-            if not compile_dut:
+                compile_dut = True #ip.is_compiled[sim_job.simulator]
+            if compile_dut:
                 cmp_ip_count = cmp_ip_count + 1
                 if ip.dut_ip_type == "fsoc":
                     dut_str = f"{ip.dut_fsoc_name}"
@@ -201,7 +257,8 @@ def main(sim_job):
         
         cmp_ip_count = cmp_ip_count + cmp_dependencies(ip, sim_job)
         
-        if not ip.is_compiled[sim_job.simulator]:
+        #if not ip.is_compiled[sim_job.simulator]:
+        if True:
             if not sim_job.is_regression:
                 common.banner("Compiling IP '" + ip_str + "'")
             cmp_ip_count = cmp_ip_count + 1
@@ -229,9 +286,9 @@ def main(sim_job):
             else:
                 cmp_target_ip(ip, sim_job)
     
-    needs_elaboration = not ip.is_elaborated[sim_job.simulator]
-    if cmp_ip_count > 0:
-        needs_elaboration = True
+    needs_elaboration = True #not ip.is_elaborated[sim_job.simulator]
+    #if cmp_ip_count > 0:
+    #    needs_elaboration = True
     
     if sim_job.elaborate and needs_elaboration:
         if sim_job.is_regression:
@@ -282,9 +339,6 @@ def main(sim_job):
             if sim_job.compile == True:
                 print_end_of_compilation_message(ip, sim_job)
             print_end_of_elaboration_message(ip, sim_job)
-    
-    if sim_job.bwrap:
-        bubble_wrap(sim_job)
 
 
 
@@ -355,7 +409,7 @@ def bubble_wrap(sim_job):
 
 def bwrap_exclude(filename):
     for regex in bwrap_ignore_list:
-        if regex in filename:
+        if filename.endswith(regex):
             return True
 
 
@@ -369,11 +423,14 @@ atexit.register(kill_progress_bar)
 def progress_bar():
     global pbar
     global seconds_waited
-    seconds = est_time
-    with tqdm(total=100) as pbar:
-        for i in range(seconds):
+    with tqdm(total=est_time) as pbar:
+        for i in range(est_time):
             sleep(1)
             pbar.update(1)
+    #with tqdm(total=seconds) as pbar:
+    #    for i in range(seconds):
+    #        sleep(1)
+    #        pbar.update(1)
         
     #with alive_bar(seconds, bar = 'smooth', stats="{eta} estimated", monitor=False, elapsed=True) as bar:
     #    bar.text("estimated")
@@ -478,50 +535,34 @@ def create_sim_directories():
     common.create_dir(cfg.sim_output_dir + "/viv"                     )
     common.create_dir(cfg.sim_output_dir + "/viv/cov_wd"              )
     common.create_dir(cfg.sim_output_dir + "/viv/cmp_out"             )
-    common.create_dir(cfg.sim_output_dir + "/viv/cmp_wd"              )
-    common.create_dir(cfg.sim_output_dir + "/viv/elab_out"            )
-    common.create_dir(cfg.sim_output_dir + "/viv/elab_out/regressions")
-    common.create_dir(cfg.sim_output_dir + "/viv/elab_out/single_sim" )
+    common.create_dir(cfg.sim_output_dir + "/viv/sim_wd"              )
+    common.create_dir(cfg.sim_output_dir + "/viv/regr_wd"             )
     common.create_dir(cfg.sim_output_dir + "/viv/so_libs"             )
-    common.create_dir(cfg.sim_output_dir + "/mtr"                     )
-    common.create_dir(cfg.sim_output_dir + "/mtr/cov_wd"              )
-    common.create_dir(cfg.sim_output_dir + "/mtr/cmp_out"             )
-    common.create_dir(cfg.sim_output_dir + "/mtr/cmp_wd"              )
-    common.create_dir(cfg.sim_output_dir + "/mtr/elab_out"            )
-    common.create_dir(cfg.sim_output_dir + "/mtr/elab_out/regressions")
-    common.create_dir(cfg.sim_output_dir + "/mtr/elab_out/single_sim" )
-    common.create_dir(cfg.sim_output_dir + "/mtr/so_libs"             )
+    common.create_dir(cfg.sim_output_dir + "/mdc"                     )
+    common.create_dir(cfg.sim_output_dir + "/mdc/so_libs"             )
     common.create_dir(cfg.sim_output_dir + "/vcs"                     )
     common.create_dir(cfg.sim_output_dir + "/vcs/cov_wd"              )
     common.create_dir(cfg.sim_output_dir + "/vcs/cmp_out"             )
-    common.create_dir(cfg.sim_output_dir + "/vcs/cmp_wd"              )
-    common.create_dir(cfg.sim_output_dir + "/vcs/elab_out"            )
-    common.create_dir(cfg.sim_output_dir + "/vcs/elab_out/regressions")
-    common.create_dir(cfg.sim_output_dir + "/vcs/elab_out/single_sim" )
+    common.create_dir(cfg.sim_output_dir + "/vcs/sim_wd"              )
+    common.create_dir(cfg.sim_output_dir + "/vcs/regr_wd"             )
     common.create_dir(cfg.sim_output_dir + "/vcs/so_libs"             )
     common.create_dir(cfg.sim_output_dir + "/xcl"                     )
     common.create_dir(cfg.sim_output_dir + "/xcl/cov_wd"              )
     common.create_dir(cfg.sim_output_dir + "/xcl/cmp_out"             )
-    common.create_dir(cfg.sim_output_dir + "/xcl/cmp_wd"              )
-    common.create_dir(cfg.sim_output_dir + "/xcl/elab_out"            )
-    common.create_dir(cfg.sim_output_dir + "/xcl/elab_out/regressions")
-    common.create_dir(cfg.sim_output_dir + "/xcl/elab_out/single_sim" )
+    common.create_dir(cfg.sim_output_dir + "/xcl/sim_wd"              )
+    common.create_dir(cfg.sim_output_dir + "/xcl/regr_wd"             )
     common.create_dir(cfg.sim_output_dir + "/xcl/so_libs"             )
     common.create_dir(cfg.sim_output_dir + "/qst"                     )
     common.create_dir(cfg.sim_output_dir + "/qst/cov_wd"              )
     common.create_dir(cfg.sim_output_dir + "/qst/cmp_out"             )
-    common.create_dir(cfg.sim_output_dir + "/qst/cmp_wd"              )
-    common.create_dir(cfg.sim_output_dir + "/qst/elab_out"            )
-    common.create_dir(cfg.sim_output_dir + "/qst/elab_out/regressions")
-    common.create_dir(cfg.sim_output_dir + "/qst/elab_out/single_sim" )
+    common.create_dir(cfg.sim_output_dir + "/qst/sim_wd"              )
+    common.create_dir(cfg.sim_output_dir + "/qst/regr_wd"             )
     common.create_dir(cfg.sim_output_dir + "/qst/so_libs"             )
     common.create_dir(cfg.sim_output_dir + "/riv"                     )
     common.create_dir(cfg.sim_output_dir + "/riv/cov_wd"              )
     common.create_dir(cfg.sim_output_dir + "/riv/cmp_out"             )
-    common.create_dir(cfg.sim_output_dir + "/riv/cmp_wd"              )
-    common.create_dir(cfg.sim_output_dir + "/riv/elab_out"            )
-    common.create_dir(cfg.sim_output_dir + "/riv/elab_out/regressions")
-    common.create_dir(cfg.sim_output_dir + "/riv/elab_out/single_sim" )
+    common.create_dir(cfg.sim_output_dir + "/riv/sim_wd"              )
+    common.create_dir(cfg.sim_output_dir + "/riv/regr_wd"             )
     common.create_dir(cfg.sim_output_dir + "/riv/so_libs"             )
     common.create_dir(cfg.sim_dir + "/cmp")
     common.create_dir(cfg.sim_dir + "/elab")
@@ -549,8 +590,8 @@ def cmp_dependencies(ip, sim_job):
         common.dbg(f"Processing dep {dep.vendor}/{dep.name} to be compiled")
         if dep.name == "uvm":
             continue
-        if not dep.is_compiled[sim_job.simulator]:
-            deps_to_cmp.append(dep)
+        #if not dep.is_compiled[sim_job.simulator]:
+        deps_to_cmp.append(dep)
     num_deps = len(deps_to_cmp)
     if num_deps > 0:
         if num_deps == 1:

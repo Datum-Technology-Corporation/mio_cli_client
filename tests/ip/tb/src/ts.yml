@@ -1,0 +1,40 @@
+## Copyright 2022 Acme Enterprises Inc.
+## SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+########################################################################################################################
+
+test-suite:
+   info:
+      name: Test Suite
+      ip: tb
+   target:
+      cmp-args : []
+      elab-args: []
+      sim-args : []
+   settings:
+      waves: [sanity, bugs]
+      cov  : [nightly, weekly]
+      verbosity:
+         sanity : high
+         nightly: medium
+         weekly : low
+         bugs   : debug
+      max-duration:
+         sanity :  1
+         nightly:  5
+         weekly : 12
+         bugs   :  1
+      max-jobs:
+         sanity :  5
+         nightly: 10
+         weekly : 20
+         bugs   :  1
+
+functional:
+   fixed:
+     hello_world:
+       sanity: [1]
+   rand: {}
+
+error:
+   fixed: {}
+   rand: {}

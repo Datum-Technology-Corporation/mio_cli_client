@@ -172,7 +172,7 @@ def load_configuration():
         default_simulator = common.simulators_enum.VIVADO
     elif default_simulator_str == "vcs":
         default_simulator = common.simulators_enum.VCS
-    elif default_simulator_str == "mtr":
+    elif default_simulator_str == "mdc":
         default_simulator = common.simulators_enum.METRICS
     elif default_simulator_str == "xcl":
         default_simulator = common.simulators_enum.XCELIUM

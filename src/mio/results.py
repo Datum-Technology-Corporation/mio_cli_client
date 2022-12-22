@@ -25,7 +25,7 @@ uvm_warning_regex = "UVM_WARNING(?! \: )"
 uvm_error_regex   = "UVM_ERROR(?! \: )"
 uvm_fatal_regex   = "UVM_FATAL(?! \: )"
 viv_fatal_error   = "FATAL_ERROR\:"
-mtr_fatal_errors  = ["FATAL_ERROR\:", "=F:"]
+mdc_fatal_errors  = ["FATAL_ERROR\:", "=F:"]
 
 uvm_gen_dir = re.sub("results.py", "", os.path.realpath(__file__)) + ".."
 relative_path_to_template = uvm_gen_dir + "/templates/"

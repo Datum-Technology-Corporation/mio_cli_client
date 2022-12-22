@@ -1,0 +1,39 @@
+## Copyright 2022 Acme Enterprises Inc.
+## SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+########################################################################################################################
+
+
+ip:
+  name: "design"
+  vendor: "acme"
+  version: "1.0.0"
+  full-name: "Demo Design"
+  type: "RTL"
+  sub-type: ""
+  description: ""
+  home-page: ""
+  repo-uri: ""
+  bugs: ""
+  aliases: []
+  logo: ""
+  block-diagram: ""
+  languages: []
+  simulators-supported:
+    mdc: "20220822.10.0"
+    viv: "2022.2"
+  tags: []
+  copyright-holders: ["Acme Enterprises Inc."]
+  licenses: []
+
+dependencies: {}
+
+structure:
+   scripts-path : "bin"
+   docs-path    : "docs"
+   examples-path: "examples"
+   src-path     : "src"
+
+hdl-src:
+  directories: ["."]
+  top-files: ["top.sv"]
+  so-libs: []

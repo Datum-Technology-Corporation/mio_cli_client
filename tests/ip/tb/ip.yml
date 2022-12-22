@@ -1,0 +1,45 @@
+## Copyright 2022 Datum Technology Corporation
+## SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+########################################################################################################################
+
+
+ip:
+  name: "tb"
+  vendor: "acme"
+  version: "1.0.0"
+  full-name: "Demo TB"
+  type: "DV"
+  sub-type: "TB"
+  sub-sub-type: ""
+  description: ""
+  home-page: ""
+  repo-uri: ""
+  bugs: ""
+  aliases: []
+  logo: ""
+  block-diagram: ""
+  languages: []
+  simulators-supported:
+    mdc: "20220822.10.0"
+    viv: "2022.2"
+  tags: []
+  copyright-holders: ["Acme Enterprises Inc."]
+  licenses: []
+
+dependencies: {}
+
+dut: "acme/design"
+
+structure:
+   scripts-path : "bin"
+   docs-path    : "docs"
+   examples-path: "examples"
+   src-path     : "src"
+
+hdl-src:
+  directories: ["."]
+  top-files: ["tb.sv"]
+  so-libs: []
+  top-constructs: ["tb"]
+  tests-path: "."
+  test-name-template: "{{ name }}_test_c"

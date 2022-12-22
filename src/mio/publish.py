@@ -200,9 +200,9 @@ def package_ip(ip, encrypt=False, destination="", create_tarball=True, org_id=""
             eal.encrypt_tree(ip_name, vcs_src_dir, "vcs")
         
         if ip.simulators_supported[common.simulators_enum.METRICS] != "":
-            mtr_src_dir = src_dir + ".mtr"
+            mtr_src_dir = src_dir + ".mdc"
             common.copy_directory(src_dir, mtr_src_dir)
-            eal.encrypt_tree(ip_name, mtr_src_dir, "mtr")
+            eal.encrypt_tree(ip_name, mtr_src_dir, "mdc")
         
         if ip.simulators_supported[common.simulators_enum.QUESTA] != "":
             qst_src_dir = src_dir + ".qst"
@@ -236,7 +236,7 @@ def package_ip(ip, encrypt=False, destination="", create_tarball=True, org_id=""
                         tar.add(vcs_src_dir, arcname="src.vcs")
                     
                     if ip.simulators_supported[common.simulators_enum.METRICS] != "":
-                        tar.add(mtr_src_dir, arcname="src.mtr")
+                        tar.add(mtr_src_dir, arcname="src.mdc")
                     
                     if ip.simulators_supported[common.simulators_enum.QUESTA] != "":
                         tar.add(qst_src_dir, arcname="src.qst")
