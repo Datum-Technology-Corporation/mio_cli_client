@@ -1,4 +1,4 @@
-# Copyright 2022 Datum Technology Corporation
+# Copyright 2021-2023 Datum Technology Corporation
 # SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
@@ -26,7 +26,7 @@ eda_processes = []
 bar = None
 
 vivado_default_compilation_args  = ["--incr", "-sv"]
-metrics_default_compilation_args = ["+acc+b", "-suppress MultiBlockWrite:ReadingOutputModport:UndefinedMacro"]
+metrics_default_compilation_args = ["-suppress MultiBlockWrite:ReadingOutputModport:UndefinedMacro"]
 vcs_default_compilation_args     = ["-lca", "-sverilog"]
 xcelium_default_compilation_args = []
 questa_default_compilation_args  = ["-64", "-incrcomp"]
@@ -35,7 +35,7 @@ riviera_default_compilation_args = []
 vivado_project_default_vlog_compilation_args = ["--relax"]
 vivado_project_default_vhdl_compilation_args = ["--relax"]
 
-vivado_default_gen_image_args  = ["--incr", "-sv", "-relax", "--O0", "-v 0", "-timescale 1ns/1ps", "-dup_entity_as_module"]
+vivado_default_gen_image_args  = ["--incr", "-sv", "-relax", "--O0", "-v 0", "-dup_entity_as_module"]
 metrics_default_gen_image_args = ["+acc+b", "-suppress MultiBlockWrite:ReadingOutputModport:UndefinedMacro:DupModuleDefn"]
 vcs_default_gen_image_args     = ["-lca", "-sverilog"]
 xcelium_default_gen_image_args = []
@@ -505,7 +505,6 @@ def compile_flist(vendor, name, flist_path, deps, sim_job, local, licensed=True)
         arg_list.append("-F " + flist_path)
         mtr_compilation_log_path = ip_dir_name + "." + sim_str + ".cmp.log"
         arg_list.append("-l " + mtr_compilation_log_path)
-        arg_list.append(f"-timescale {cfg.sim_timescale}")
         
         arg_list_str = ""
         for arg in arg_list:
@@ -860,9 +859,16 @@ def do_simulate(ip, sim_job, wd):
         arg_list.append("-l " + mtr_simulation_log_path)
         arg_list.append("-sv_seed " + str(sim_job.seed))
         arg_list.append(f"-image {ip.vendor}__{ip.name}")
-        arg_list.append(f"-sv_lib %UVM_HOME%/src/dpi/libuvm_dpi.so")
         arg_list.append(f"-timescale {cfg.sim_timescale}")
+        arg_list.append(f"-sv_lib %UVM_HOME%/src/dpi/libuvm_dpi.so")
         #arg_list.append(f"-work {ip.vendor}__{ip.name}")
+        
+        so_libs = get_all_so_libs(ip, sim_job)
+        for so_lib in so_libs:
+            so_lib_temp_path = f"{cfg.temp_path}/{so_lib}"
+            common.copy_file(so_libs[so_lib], so_lib_temp_path)
+            so_lib_path = os.path.relpath(so_lib_temp_path, cfg.project_dir)
+            arg_list.append(f"-sv_lib {so_lib_path}")
         
         arg_list_str = ""
         for arg in arg_list:
@@ -1446,10 +1452,12 @@ def encrypt_tree(ip_name, location, app):
                 file_w = open(file,mode='w')
                 file_w.write("`pragma protect begin\n")
                 file_w.write(file_text)
-                file_w.write("`pragma protect end")
+                file_w.write("\n`pragma protect end")
                 file_w.close()
                 file_rel_path = os.path.relpath(file, cfg.temp_path)
                 args = [file_rel_path, f"-i {mtr_key_rel_path}", f"-o {file_rel_path}.e"]
+                #if cfg.dbg:
+                #    args.append("-v")
                 arg_list_str = ""
                 for arg in args:
                     arg_list_str = arg_list_str + f" {arg}"
@@ -1459,6 +1467,7 @@ def encrypt_tree(ip_name, location, app):
                     arg_list = [f"dvlencrypt -a '{arg_list_str}'"]
                 launch_eda_bin(cfg.metrics_home + "/mdc", arg_list, cfg.temp_path, cfg.dbg)
                 launch_eda_bin(cfg.metrics_home + "/mdc", ["download", f"{file_rel_path}.e"], cfg.temp_path, cfg.dbg)
+                #common.move_file(file, f"{file}.orig")
                 common.move_file(f"{cfg.temp_path}/_downloaded_{filename}.e", file)
                 pbar.update(1)
     else:

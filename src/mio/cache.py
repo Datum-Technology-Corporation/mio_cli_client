@@ -1,4 +1,4 @@
-# Copyright 2022 Datum Technology Corporation
+# Copyright 2021-2023 Datum Technology Corporation
 # SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
@@ -330,7 +330,7 @@ class IP:
                     else:
                         raise Exception(f"Malformed dut section")
                 
-                if (self.is_licensed == True) and (self.is_encrypted == True):
+                if self.is_licensed == True:
                     if not ((self.vendor == "datum") and (self.name == "uvml_mio_lic")):
                         dep_model = Dependency(self, "datum/uvml_mio_lic", "^")
                         self.dependencies.append(dep_model)

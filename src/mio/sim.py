@@ -1,4 +1,4 @@
-# Copyright 2022 Datum Technology Corporation
+# Copyright 2021-2023 Datum Technology Corporation
 # SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
@@ -349,22 +349,22 @@ def bubble_wrap(sim_job):
     
     if sim_job.simulator == common.simulators_enum.VIVADO:
         bin_text = "MIO_VIVADO_HOME"
-        bin_string = "vivado/bin"
+        bin_string = "/tools/vivado/bin"
     if sim_job.simulator == common.simulators_enum.METRICS:
         bin_text = "MIO_METRICS_HOME"
-        bin_string = "metrics/bin"
+        bin_string = "/usr/local/bin"
     if sim_job.simulator == common.simulators_enum.VCS:
         bin_text = "MIO_VCS_HOME"
-        bin_string = "vcs/bin"
+        bin_string = "/tools/vcs/bin"
     if sim_job.simulator == common.simulators_enum.QUESTA:
         bin_text = "MIO_QUESTA_HOME"
-        bin_string = "questa/bin"
+        bin_string = "/tools/questa/bin"
     if sim_job.simulator == common.simulators_enum.XCELIUM:
         bin_text = "MIO_XCELIUM_HOME"
-        bin_string = "xcelium/bin"
+        bin_string = "/tools/xcelium/bin"
     if sim_job.simulator == common.simulators_enum.RIVIERA:
         bin_text = "MIO_RIVIERA_HOME"
-        bin_string = "riviera/bin"
+        bin_string = "/tools/riviera/bin"
     
     try:
         with open(run_script_path, 'w') as run_script_file:
@@ -384,7 +384,7 @@ def bubble_wrap(sim_job):
                 run_script_file.write(f"{cmd}\n\n")
         common.info(f"Wrote {run_script_path}")
         with open(readme_path, 'w') as readme_file:
-            readme_file.write(f"1. Set ${bin_text}.  Ex: export {bin_text}=/tools/{bin_string}\n")
+            readme_file.write(f"1. Set ${bin_text}.  Ex: export {bin_text}={bin_string}\n")
             readme_file.write(f"2. Run: bash ./run.sh\n")
         common.info(f"Wrote {readme_path}")
         
@@ -399,7 +399,10 @@ def bubble_wrap(sim_job):
                     if file in bwrap_ignore_dirs:
                         continue
                 common.dbg(f"Compressing {file}")
-                tar.add(file_path, exclude=bwrap_exclude, arcname=file)
+                try:
+                    tar.add(file_path, filter=bwrap_exclude, arcname=file)
+                except TypeError:
+                    tar.add(file_path, exclude=bwrap_exclude, arcname=file)
         common.info("Done")
         
     except Exception as e:
@@ -538,8 +541,6 @@ def create_sim_directories():
     common.create_dir(cfg.sim_output_dir + "/viv/sim_wd"              )
     common.create_dir(cfg.sim_output_dir + "/viv/regr_wd"             )
     common.create_dir(cfg.sim_output_dir + "/viv/so_libs"             )
-    common.create_dir(cfg.sim_output_dir + "/mdc"                     )
-    common.create_dir(cfg.sim_output_dir + "/mdc/so_libs"             )
     common.create_dir(cfg.sim_output_dir + "/vcs"                     )
     common.create_dir(cfg.sim_output_dir + "/vcs/cov_wd"              )
     common.create_dir(cfg.sim_output_dir + "/vcs/cmp_out"             )

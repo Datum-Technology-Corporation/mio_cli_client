@@ -1,4 +1,4 @@
-# Copyright 2022 Datum Technology Corporation
+# Copyright 2021-2023 Datum Technology Corporation
 # SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
@@ -48,14 +48,13 @@ def main(ip_str, deep_clean):
 
 def clean_core(core):
     common.info(f"Deleting code and compiled code objects for FuseSoC core '{core.sname}'")
-    common.remove_dir(cfg.sim_output_dir + '/viv/cmp_out/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/mdc/cmp_out/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_out/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_out/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/qst/cmp_out/@fsoc__' + core.sname)
-    common.remove_dir(cfg.sim_output_dir + '/riv/cmp_out/@fsoc__' + core.sname)
-    common.remove_dir(cfg.fsoc_dir + "/" + core_name)
-    cfg.fsoc_cache[core_name]['installed'] = False
+    common.remove_dir(cfg.sim_output_dir + '/viv/cmp_wd/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/vcs/cmp_wd/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/xcl/cmp_wd/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/qst/cmp_wd/@fsoc__' + core.sname)
+    common.remove_dir(cfg.sim_output_dir + '/riv/cmp_wd/@fsoc__' + core.sname)
+    common.remove_dir(cfg.fsoc_dir + "/" + core.sname)
+    core.is_installed = False
 
 
 def clean_ip(ip, no_infos=False):

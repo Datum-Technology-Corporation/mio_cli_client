@@ -1,9 +1,9 @@
-# Copyright 2021-2022 Datum Technology Corporation
+# Copyright 2021-2023 Datum Technology Corporation
 # SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
 
-version = "1.0.4"
+version = "1.0.5"
 version_text = f"Moore.io CLI Client v{version}"
 
 
@@ -12,7 +12,7 @@ version_text = f"Moore.io CLI Client v{version}"
 main_help_text = f"""
                                  Moore.io (`mio`) Command Line Interface (CLI) - v{version}
                                       User Manual: https://mio-cli.readthedocs.io/
-              https://mooreio.com - Copyright 2021-2022 Datum Technology Corporation - https://datumtc.ca
+              https://mooreio.com - Copyright 2021-2023 Datum Technology Corporation - https://datumtc.ca
 Usage:
   mio [--version] [--help]
   mio [--wd WD] [--dbg] CMD [OPTIONS]

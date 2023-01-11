@@ -1,13 +1,12 @@
-#! /usr/bin/python3 
-# -*- coding: UTF-8 -*-
+#! /bin/bash
 ########################################################################################################################
-# Copyright 2021-2023 Datum Technology Corporation
+# Copyright Datum Technology Corporation
 # SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
 
-from mio import cli
+export mio="mio "
 
-def main():
-    cli.main()
+$mio --dbg sim tb -t hello_world -s 1 -w -c -a xcl
+#$mio --dbg regr tb sanity -a xcl
 

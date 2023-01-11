@@ -4,7 +4,7 @@
 
 
 [ip]
-paths = ["tests/ip"]
+paths = ["ip"]
 
 [org]
 name = "Datum"
@@ -16,8 +16,4 @@ full-name   = "Moore.io CLI Client"
 description = ""
 
 [simulation]
-root-path   = "tests/sim"
-default-simulator = "viv"
-
-[encryption]
-vivado-key-path = "bin/key.viv.txt"
+root-path   = "sim"

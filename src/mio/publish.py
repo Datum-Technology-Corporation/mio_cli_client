@@ -1,4 +1,4 @@
-# Copyright 2022 Datum Technology Corporation
+# Copyright 2021-2023 Datum Technology Corporation
 # SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
@@ -139,7 +139,7 @@ def cli_package_ip(ip_str, destination, no_tarball):
     if create_tarball:
         common.info(f"Compressed archive created at {path}")
     else:
-        if encrypt:
+        if ip.is_licensed:
             common.info(f"Encrypted IP code output to {path}")
         else:
             common.info(f"IP code output to {path}")
