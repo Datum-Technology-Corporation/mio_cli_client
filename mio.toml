@@ -1,4 +1,4 @@
-# Copyright Datum Technology Corporation
+# Copyright 2021-2023 Datum Technology Corporation
 # SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
@@ -15,5 +15,3 @@ name        = "mio_cli"
 full-name   = "Moore.io CLI Client"
 description = ""
 
-[simulation]
-root-path   = "sim"

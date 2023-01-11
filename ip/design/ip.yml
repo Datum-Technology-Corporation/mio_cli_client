@@ -1,4 +1,4 @@
-## Copyright 2022 Acme Enterprises Inc.
+## Copyright 2021-2023 Datum Technology Corporation
 ## SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 ########################################################################################################################
 
@@ -22,8 +22,8 @@ ip:
     mdc: "20220822.10.0"
     viv: "2022.2"
   tags: []
-  copyright-holders: ["Acme Enterprises Inc."]
-  licenses: []
+  copyright-holders: ["Datum Technology Corporation"]
+  licenses: ["Apache-2.0 WITH SHL-2.1"]
 
 dependencies: {}
 

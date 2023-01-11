@@ -1,3 +1,8 @@
+# Copyright 2021-2023 Datum Technology Corporation
+# SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+########################################################################################################################
+
+
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -23,7 +28,7 @@ copyright = '2021-2023 Datum Technology Corporation'
 #author = 'Datum Technology Corporation'
 
 # The full version, including alpha/beta/rc tags
-release = '1.0.5'
+release = '1.0.6'
 
 
 # -- General configuration ---------------------------------------------------
